@@ -1,494 +1,495 @@
-{{!< default}}
-{{!-- The tag above means: insert everything in this file into the body of the default.hbs template --}}
+{{!< default}} {{!-- The tag above means: insert everything in this file into the body of the default.hbs template --}}
+    {{!-- Supabase JS Client --}} <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+    </script>
 
-{{!-- Supabase JS Client --}}
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    {{!-- Gating Styles --}}
+    <style>
+        .gh-gated-content.is-locked {
+            filter: blur(12px);
+            pointer-events: none;
+            opacity: 0.4;
+            user-select: none;
+        }
 
-{{!-- Gating Styles --}}
-<style>
-    .gh-gated-content.is-locked {
-        filter: blur(12px);
-        pointer-events: none;
-        opacity: 0.4;
-        user-select: none;
-    }
-    
-    .gh-gate-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        z-index: 9998;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(4px);
-    }
-    
-    .gh-gate-overlay.is-visible {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .gh-gate-modal {
-        position: relative;
-        background: #fff;
-        padding: 48px 40px;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        text-align: center;
-        max-width: 420px;
-        width: 90%;
-    }
-    
-    .gh-gate-modal h2 {
-        margin: 0 0 12px;
-        font-size: 2.4rem;
-        font-weight: 700;
-        color: #15171a;
-    }
-    
-    .gh-gate-modal p {
-        margin: 0 0 24px;
-        font-size: 1.5rem;
-        color: #505050;
-        line-height: 1.5;
-    }
-    
-    .gh-gate-form {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-    
-    .gh-gate-input {
-        padding: 14px 18px;
-        font-size: 1.6rem;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        outline: none;
-        transition: border-color 0.2s;
-    }
-    
-    .gh-gate-input:focus {
-        border-color: var(--ghost-accent-color, #3db4f2);
-    }
-    
-    .gh-gate-btn {
-        padding: 14px 24px;
-        font-size: 1.6rem;
-        font-weight: 600;
-        color: #fff;
-        background: var(--ghost-accent-color, #3db4f2);
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: opacity 0.2s;
-    }
-    
-    .gh-gate-btn:hover {
-        opacity: 0.9;
-    }
-    
-    .gh-gate-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-    
-    .gh-gate-toggle {
-        margin-top: 20px;
-        font-size: 1.4rem;
-        color: #707070;
-    }
-    
-    .gh-gate-toggle a {
-        color: var(--ghost-accent-color, #3db4f2);
-        cursor: pointer;
-        text-decoration: underline;
-    }
-    
-    .gh-gate-error {
-        margin-top: 12px;
-        padding: 10px;
-        font-size: 1.4rem;
-        color: #c0392b;
-        background: #fdeaea;
-        border-radius: 6px;
-        display: none;
-    }
-    
-    .gh-gate-error.is-visible {
-        display: block;
-    }
-    
-    .gh-gate-success {
-        margin-top: 12px;
-        padding: 10px;
-        font-size: 1.4rem;
-        color: #27ae60;
-        background: #eafaf1;
-        border-radius: 6px;
-        display: none;
-    }
-    
-    .gh-gate-success.is-visible {
-        display: block;
-    }
+        .gh-gate-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
 
-    /* DocSend iframe container */
-    .gh-docsend-container {
-        width: 100%;
-        min-height: 80vh;
-        margin-top: 24px;
-    }
-    
-    .gh-docsend-container iframe {
-        width: 100%;
-        height: 80vh;
-        border: none;
-        border-radius: 8px;
-    }
-</style>
+        .gh-gate-overlay.is-visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-{{#post}}
+        .gh-gate-modal {
+            position: relative;
+            background: #fff;
+            padding: 48px 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 420px;
+            width: 90%;
+        }
 
-<main class="gh-main">
+        .gh-gate-modal h2 {
+            margin: 0 0 12px;
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: #15171a;
+        }
 
-    <article class="gh-article {{post_class}}">
+        .gh-gate-modal p {
+            margin: 0 0 24px;
+            font-size: 1.5rem;
+            color: #505050;
+            line-height: 1.5;
+        }
 
-        <header class="gh-article-header gh-canvas">
+        .gh-gate-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
 
-            {{#if primary_tag}}
+        .gh-gate-input {
+            padding: 14px 18px;
+            font-size: 1.6rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .gh-gate-input:focus {
+            border-color: var(--ghost-accent-color, #3db4f2);
+        }
+
+        .gh-gate-btn {
+            padding: 14px 24px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #fff;
+            background: var(--ghost-accent-color, #3db4f2);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .gh-gate-btn:hover {
+            opacity: 0.9;
+        }
+
+        .gh-gate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .gh-gate-toggle {
+            margin-top: 20px;
+            font-size: 1.4rem;
+            color: #707070;
+        }
+
+        .gh-gate-toggle a {
+            color: var(--ghost-accent-color, #3db4f2);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .gh-gate-error {
+            margin-top: 12px;
+            padding: 10px;
+            font-size: 1.4rem;
+            color: #c0392b;
+            background: #fdeaea;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .gh-gate-error.is-visible {
+            display: block;
+        }
+
+        .gh-gate-success {
+            margin-top: 12px;
+            padding: 10px;
+            font-size: 1.4rem;
+            color: #27ae60;
+            background: #eafaf1;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .gh-gate-success.is-visible {
+            display: block;
+        }
+
+        /* DocSend iframe container */
+        .gh-docsend-container {
+            width: 100%;
+            min-height: 80vh;
+            margin-top: 24px;
+        }
+
+        .gh-docsend-container iframe {
+            width: 100%;
+            height: 80vh;
+            border: none;
+            border-radius: 8px;
+        }
+    </style>
+
+    {{#post}}
+
+    <main class="gh-main">
+
+        <article class="gh-article {{post_class}}">
+
+            <header class="gh-article-header gh-canvas">
+
+                {{#if primary_tag}}
                 <a class="gh-article-tag" href="{{primary_tag.url}}">{{primary_tag.name}}</a>
-            {{/if}}
-            <h1 class="gh-article-title is-title">{{title}}</h1>
-            {{#if custom_excerpt}}
+                {{/if}}
+                <h1 class="gh-article-title is-title">{{title}}</h1>
+                {{#if custom_excerpt}}
                 <p class="gh-article-excerpt is-body">{{custom_excerpt}}</p>
-            {{/if}}
+                {{/if}}
 
-            {{#if @custom.show_post_metadata}}
-            <div class="gh-article-meta">
-                <div class="gh-article-author-image instapaper_ignore">
-                    {{#foreach authors}}
+                {{#if @custom.show_post_metadata}}
+                <div class="gh-article-meta">
+                    <div class="gh-article-author-image instapaper_ignore">
+                        {{#foreach authors}}
                         {{#if profile_image}}
-                            <a href="{{url}}">
-                                <img class="author-profile-image" src="{{img_url profile_image size="xs"}}" alt="{{name}}">
-                            </a>
+                        <a href="{{url}}">
+                            <img class="author-profile-image" src="{{img_url profile_image size=" xs"}}" alt="{{name}}">
+                        </a>
                         {{else}}
-                            <a href="{{url}}">{{> "icons/avatar"}}</a>
+                        <a href="{{url}}">{{> "icons/avatar"}}</a>
                         {{/if}}
-                    {{/foreach}}
-                </div>
-                <div class="gh-article-meta-wrapper">
-                    <h4 class="gh-article-author-name">{{authors}}</h4>
-                    <div class="gh-article-meta-content">
-                        <time class="gh-article-meta-date" datetime="{{date format="YYYY-MM-DD"}}">{{date format="DD MMM YYYY"}}</time>
-                        {{#if reading_time}}
+                        {{/foreach}}
+                    </div>
+                    <div class="gh-article-meta-wrapper">
+                        <h4 class="gh-article-author-name">{{authors}}</h4>
+                        <div class="gh-article-meta-content">
+                            <time class="gh-article-meta-date" datetime="{{date format=" YYYY-MM-DD"}}">{{date
+                                format="DD MMM YYYY"}}</time>
+                            {{#if reading_time}}
                             <span class="gh-article-meta-length"><span class="bull">—</span> {{reading_time}}</span>
-                        {{/if}}
+                            {{/if}}
+                        </div>
                     </div>
                 </div>
-            </div>
-            {{/if}}
+                {{/if}}
 
-            {{> "feature-image"}}
+                {{> "feature-image"}}
 
-        </header>
+            </header>
 
-        {{!-- Gated Content Section --}}
-        <section id="gh-gated-content" class="gh-content gh-canvas is-body gh-gated-content is-locked{{#if @custom.enable_drop_caps_on_posts}} drop-cap{{/if}}">
-            {{content}}
-        </section>
+            {{!-- Gated Content Section --}}
+            <section id="gh-gated-content"
+                class="gh-content gh-canvas is-body gh-gated-content is-locked{{#if @custom.enable_drop_caps_on_posts}} drop-cap{{/if}}">
+                {{content}}
+            </section>
 
-        {{!-- DocSend Container (shown after access granted) --}}
-        <div id="gh-docsend-container" class="gh-docsend-container gh-canvas" style="display: none;"></div>
+            {{!-- DocSend Container (shown after access granted) --}}
+            <div id="gh-docsend-container" class="gh-docsend-container gh-canvas" style="display: none;"></div>
 
-    </article>
+        </article>
 
-    {{#if comments}}
+        {{#if comments}}
         <div class="gh-comments gh-canvas">
             {{comments}}
         </div>
-    {{/if}}
+        {{/if}}
 
-</main>
+    </main>
 
-{{!-- Gate Overlay Modal --}}
-<div id="gh-gate-overlay" class="gh-gate-overlay is-visible">
-    <div class="gh-gate-modal">
-        {{!-- Default View: Request Briefing --}}
-        <div id="gh-gate-request" class="gh-gate-view">
-            <h2>Request Briefing</h2>
-            <p>Enter your email to access this intelligence report.</p>
-            <form id="gh-gate-request-form" class="gh-gate-form">
-                <input type="email" id="gh-gate-email" class="gh-gate-input" placeholder="your@email.com" required>
-                <button type="submit" class="gh-gate-btn">Get Access</button>
-            </form>
-            <div id="gh-gate-request-error" class="gh-gate-error"></div>
-            <div id="gh-gate-request-success" class="gh-gate-success"></div>
-            <p class="gh-gate-toggle">Already a partner? <a id="gh-toggle-login">Sign in here</a></p>
-        </div>
-        
-        {{!-- Secondary View: Partner Login --}}
-        <div id="gh-gate-login" class="gh-gate-view" style="display: none;">
-            <h2>Partner Login</h2>
-            <p>Enter your email to receive a magic link.</p>
-            <form id="gh-gate-login-form" class="gh-gate-form">
-                <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com" required>
-                <button type="submit" class="gh-gate-btn">Send Magic Link</button>
-            </form>
-            <div id="gh-gate-login-error" class="gh-gate-error"></div>
-            <div id="gh-gate-login-success" class="gh-gate-success"></div>
-            <p class="gh-gate-toggle">New here? <a id="gh-toggle-request">Request access</a></p>
+    {{!-- Gate Overlay Modal --}}
+    <div id="gh-gate-overlay" class="gh-gate-overlay is-visible">
+        <div class="gh-gate-modal">
+            {{!-- Default View: Request Briefing --}}
+            <div id="gh-gate-request" class="gh-gate-view">
+                <h2>Request Briefing</h2>
+                <p>Enter your email to access this intelligence report.</p>
+                <form id="gh-gate-request-form" class="gh-gate-form">
+                    <input type="email" id="gh-gate-email" class="gh-gate-input" placeholder="your@email.com" required>
+                    <button type="submit" class="gh-gate-btn">Get Access</button>
+                </form>
+                <div id="gh-gate-request-error" class="gh-gate-error"></div>
+                <div id="gh-gate-request-success" class="gh-gate-success"></div>
+                <p class="gh-gate-toggle">Already a partner? <a id="gh-toggle-login">Sign in here</a></p>
+            </div>
+
+            {{!-- Secondary View: Partner Login --}}
+            <div id="gh-gate-login" class="gh-gate-view" style="display: none;">
+                <h2>Partner Login</h2>
+                <p>Enter your email to receive a magic link.</p>
+                <form id="gh-gate-login-form" class="gh-gate-form">
+                    <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com"
+                        required>
+                    <button type="submit" class="gh-gate-btn">Send Magic Link</button>
+                </form>
+                <div id="gh-gate-login-error" class="gh-gate-error"></div>
+                <div id="gh-gate-login-success" class="gh-gate-success"></div>
+                <p class="gh-gate-toggle">New here? <a id="gh-toggle-request">Request access</a></p>
+            </div>
         </div>
     </div>
-</div>
 
-{{/post}}
+    {{/post}}
 
-{{#if @custom.show_related_articles}}
+    {{#if @custom.show_related_articles}}
     {{#get "posts" include="authors" filter="id:-{{post.id}}" limit="4" as |next|}}
-        {{#if next}}
-            <section class="gh-container is-grid gh-outer">
-                <div class="gh-container-inner gh-inner">
-                    <h2 class="gh-container-title">Read more</h2>
-                    <div class="gh-feed">
-                        {{#foreach next}}
-                            {{> "post-card" lazyLoad=true}}
-                        {{/foreach}}
-                    </div>
-                </div>
-            </section>
-        {{/if}}
+    {{#if next}}
+    <section class="gh-container is-grid gh-outer">
+        <div class="gh-container-inner gh-inner">
+            <h2 class="gh-container-title">Read more</h2>
+            <div class="gh-feed">
+                {{#foreach next}}
+                {{> "post-card" lazyLoad=true}}
+                {{/foreach}}
+            </div>
+        </div>
+    </section>
+    {{/if}}
     {{/get}}
-{{/if}}
+    {{/if}}
 
-{{!-- Gating Logic Script --}}
-<script>
-(function() {
-    // ============================================
-    // CONFIGURATION - Update these values
-    // ============================================
-    const SUPABASE_URL = 'https://ohwoclsqlwnchtjtylxj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
-    const EDGE_FUNCTION_URL = SUPABASE_URL + '/functions/v1';
-    const URL_TYPEFORM = 'https://your.typeform.com/to/feedback';
-    const URL_CALENDLY = 'https://calendly.com/founder/intro';
-    
-    // Fallback limits (used if global_settings fetch fails)
-    let LIMIT_TIER1 = 1;
-    let LIMIT_TIER2 = 3;
-    
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-    // DOM Elements
-    const gatedContent = document.getElementById('gh-gated-content');
-    const docsendContainer = document.getElementById('gh-docsend-container');
-    const gateOverlay = document.getElementById('gh-gate-overlay');
-    const gateRequest = document.getElementById('gh-gate-request');
-    const gateLogin = document.getElementById('gh-gate-login');
-    const requestForm = document.getElementById('gh-gate-request-form');
-    const loginForm = document.getElementById('gh-gate-login-form');
-    const toggleLogin = document.getElementById('gh-toggle-login');
-    const toggleRequest = document.getElementById('gh-toggle-request');
-    
-    // Get current post slug from URL
-    const currentSlug = window.location.pathname.replace(/^\/|\/$/g, '');
-    
-    // Check for promo (Golden Ticket) parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const promoReport = urlParams.get('promo_report');
-    
-    toggleLogin.addEventListener('click', function() {
-        gateRequest.style.display = 'none';
-        gateLogin.style.display = 'block';
-    });
-    
-    toggleRequest.addEventListener('click', function() {
-        gateLogin.style.display = 'none';
-        gateRequest.style.display = 'block';
-    });
-    
-    
-    // Request Briefing Form (New Users - Tier 1 Entry)
-    requestForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const email = document.getElementById('gh-gate-email').value;
-        const btn = requestForm.querySelector('button');
-        const errorEl = document.getElementById('gh-gate-request-error');
-        const successEl = document.getElementById('gh-gate-request-success');
-        
-        btn.disabled = true;
-        btn.textContent = 'Sending...';
-        errorEl.classList.remove('is-visible');
-        successEl.classList.remove('is-visible');
-        
-        try {
-            const response = await fetch(EDGE_FUNCTION_URL + '/invite-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email })
+    {{!-- Gating Logic Script --}}
+    <script>
+        (function () {
+            // ============================================
+            // CONFIGURATION - Update these values
+            // ============================================
+            const SUPABASE_URL = 'https://ohwoclsqlwnchtjtylxj.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
+            const EDGE_FUNCTION_URL = SUPABASE_URL + '/functions/v1';
+            const URL_TYPEFORM = 'https://your.typeform.com/to/feedback';
+            const URL_CALENDLY = 'https://calendly.com/founder/intro';
+
+            // Fallback limits (used if global_settings fetch fails)
+            let LIMIT_TIER1 = 1;
+            let LIMIT_TIER2 = 3;
+
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            // DOM Elements
+            const gatedContent = document.getElementById('gh-gated-content');
+            const docsendContainer = document.getElementById('gh-docsend-container');
+            const gateOverlay = document.getElementById('gh-gate-overlay');
+            const gateRequest = document.getElementById('gh-gate-request');
+            const gateLogin = document.getElementById('gh-gate-login');
+            const requestForm = document.getElementById('gh-gate-request-form');
+            const loginForm = document.getElementById('gh-gate-login-form');
+            const toggleLogin = document.getElementById('gh-toggle-login');
+            const toggleRequest = document.getElementById('gh-toggle-request');
+
+            // Get current post slug from URL
+            const currentSlug = window.location.pathname.replace(/^\/|\/$/g, '');
+
+            // Check for promo (Golden Ticket) parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const promoReport = urlParams.get('promo_report');
+
+            toggleLogin.addEventListener('click', function () {
+                gateRequest.style.display = 'none';
+                gateLogin.style.display = 'block';
             });
-            
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to send magic link');
-            }
-            
-            successEl.textContent = 'Check your email for the magic link!';
-            successEl.classList.add('is-visible');
-            btn.textContent = 'Link Sent!';
-        } catch (err) {
-            errorEl.textContent = err.message;
-            errorEl.classList.add('is-visible');
-            btn.disabled = false;
-            btn.textContent = 'Get Access';
-        }
-    });
-    
-    // Partner Login Form (Returning Users)
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const email = document.getElementById('gh-gate-login-email').value;
-        const btn = loginForm.querySelector('button');
-        const errorEl = document.getElementById('gh-gate-login-error');
-        const successEl = document.getElementById('gh-gate-login-success');
-        
-        btn.disabled = true;
-        btn.textContent = 'Sending...';
-        errorEl.classList.remove('is-visible');
-        successEl.classList.remove('is-visible');
-        
-        try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email: email,
-                options: {
-                    emailRedirectTo: window.location.href
+
+            toggleRequest.addEventListener('click', function () {
+                gateLogin.style.display = 'none';
+                gateRequest.style.display = 'block';
+            });
+
+
+            // Request Briefing Form (New Users - Tier 1 Entry)
+            requestForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const email = document.getElementById('gh-gate-email').value;
+                const btn = requestForm.querySelector('button');
+                const errorEl = document.getElementById('gh-gate-request-error');
+                const successEl = document.getElementById('gh-gate-request-success');
+
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+                errorEl.classList.remove('is-visible');
+                successEl.classList.remove('is-visible');
+
+                try {
+                    const response = await fetch(EDGE_FUNCTION_URL + '/invite-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to send magic link');
+                    }
+
+                    successEl.textContent = 'Check your email for the magic link!';
+                    successEl.classList.add('is-visible');
+                    btn.textContent = 'Link Sent!';
+                } catch (err) {
+                    errorEl.textContent = err.message;
+                    errorEl.classList.add('is-visible');
+                    btn.disabled = false;
+                    btn.textContent = 'Get Access';
                 }
             });
-            
-            if (error) throw error;
-            
-            successEl.textContent = 'Check your email for the magic link!';
-            successEl.classList.add('is-visible');
-            btn.textContent = 'Link Sent!';
-        } catch (err) {
-            errorEl.textContent = err.message;
-            errorEl.classList.add('is-visible');
-            btn.disabled = false;
-            btn.textContent = 'Send Magic Link';
-        }
-    });
-    
-    
-    function grantAccess(email) {
-        // Hide gate overlay
-        gateOverlay.classList.remove('is-visible');
 
-        // Unlock content
-        gatedContent.classList.remove('is-locked');
-        // loadDocSend(email);
-        
-        console.log('Access granted for:', email);
-    }
-    
-    function loadDocSend(email) {
-    }
-    
-    function redirectToTypeform(email) {
-        window.location.href = URL_TYPEFORM + '?user_email=' + encodeURIComponent(email);
-    }
-    
-    function redirectToCalendly() {
-        window.location.href = URL_CALENDLY;
-    }
-    
-    async function init() {
-        try {
-            // 1. Fetch global settings for tier limits
-            const { data: settings } = await supabase
-                .from('global_settings')
-                .select('key, value')
-                .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
-            
-            if (settings && settings.length > 0) {
-                const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
-                LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
-                LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
+            // Partner Login Form (Returning Users)
+            loginForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const email = document.getElementById('gh-gate-login-email').value;
+                const btn = loginForm.querySelector('button');
+                const errorEl = document.getElementById('gh-gate-login-error');
+                const successEl = document.getElementById('gh-gate-login-success');
+
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+                errorEl.classList.remove('is-visible');
+                successEl.classList.remove('is-visible');
+
+                try {
+                    const { error } = await supabase.auth.signInWithOtp({
+                        email: email,
+                        options: {
+                            emailRedirectTo: window.location.href
+                        }
+                    });
+
+                    if (error) throw error;
+
+                    successEl.textContent = 'Check your email for the magic link!';
+                    successEl.classList.add('is-visible');
+                    btn.textContent = 'Link Sent!';
+                } catch (err) {
+                    errorEl.textContent = err.message;
+                    errorEl.classList.add('is-visible');
+                    btn.disabled = false;
+                    btn.textContent = 'Send Magic Link';
+                }
+            });
+
+
+            function grantAccess(email) {
+                // Hide gate overlay
+                gateOverlay.classList.remove('is-visible');
+
+                // Unlock content
+                gatedContent.classList.remove('is-locked');
+                // loadDocSend(email);
+
+                console.log('Access granted for:', email);
             }
-            
-            // 2. Check for existing session
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (!session) {
-                // No session - show gate
-                return;
+
+            function loadDocSend(email) {
             }
-            
-            // 3. Get user status from allowed_users
-            const { data: user, error: userError } = await supabase
-                .from('allowed_users')
-                .select('status, unlocks_count, email')
-                .eq('email', session.user.email)
-                .single();
-            
-            if (userError || !user) {
-                // User not in allowed_users - show gate
-                console.log('User not found in allowed_users');
-                return;
+
+            function redirectToTypeform(email) {
+                window.location.href = URL_TYPEFORM + '?user_email=' + encodeURIComponent(email);
             }
-            
-            // 4. Check for Golden Ticket (promo access)
-            if (promoReport && promoReport === currentSlug) {
-                // This is the promo report - grant free access without incrementing
-                return grantAccess(session.user.email);
+
+            function redirectToCalendly() {
+                window.location.href = URL_CALENDLY;
             }
-            
-            // 5. THE LADDER LOGIC
-            
-            // VIP Check - Unlimited access
-            if (user.status === 'vip') {
-                return grantAccess(session.user.email);
-            }
-            
-            // Tier 2 Check
-            if (user.status === 'tier2') {
-                if (user.unlocks_count < LIMIT_TIER2) {
-                    // Increment unlock count
-                    await supabase.rpc('increment_unlock', { user_email: session.user.email });
-                    return grantAccess(session.user.email);
-                } else {
-                    // Hit Wall #2 - Redirect to Calendly
-                    return redirectToCalendly();
+
+            async function init() {
+                try {
+                    // 1. Fetch global settings for tier limits
+                    const { data: settings } = await supabase
+                        .from('global_settings')
+                        .select('key, value')
+                        .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
+
+                    if (settings && settings.length > 0) {
+                        const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
+                        LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
+                        LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
+                    }
+
+                    // 2. Check for existing session
+                    const { data: { session } } = await supabase.auth.getSession();
+
+                    if (!session) {
+                        // No session - show gate
+                        return;
+                    }
+
+                    // 3. Get user status from allowed_users
+                    const { data: user, error: userError } = await supabase
+                        .from('allowed_users')
+                        .select('status, unlocks_count, email')
+                        .eq('email', session.user.email)
+                        .single();
+
+                    if (userError || !user) {
+                        // User not in allowed_users - show gate
+                        console.log('User not found in allowed_users');
+                        return;
+                    }
+
+                    // 4. Check for Golden Ticket (promo access)
+                    if (promoReport && promoReport === currentSlug) {
+                        // This is the promo report - grant free access without incrementing
+                        return grantAccess(session.user.email);
+                    }
+
+                    // 5. THE LADDER LOGIC
+
+                    // VIP Check - Unlimited access
+                    if (user.status === 'vip') {
+                        return grantAccess(session.user.email);
+                    }
+
+                    // Tier 2 Check
+                    if (user.status === 'tier2') {
+                        if (user.unlocks_count < LIMIT_TIER2) {
+                            // Increment unlock count
+                            await supabase.rpc('increment_unlock', { user_email: session.user.email });
+                            return grantAccess(session.user.email);
+                        } else {
+                            // Hit Wall #2 - Redirect to Calendly
+                            return redirectToCalendly();
+                        }
+                    }
+
+                    // Tier 1 Check
+                    if (user.status === 'tier1') {
+                        if (user.unlocks_count < LIMIT_TIER1) {
+                            // Increment unlock count
+                            await supabase.rpc('increment_unlock', { user_email: session.user.email });
+                            return grantAccess(session.user.email);
+                        } else {
+                            // Hit Wall #1 - Redirect to Typeform
+                            return redirectToTypeform(user.email);
+                        }
+                    }
+
+                } catch (err) {
+                    console.error('Gating init error:', err);
+                    // On error, keep gate visible for safety
                 }
             }
-            
-            // Tier 1 Check
-            if (user.status === 'tier1') {
-                if (user.unlocks_count < LIMIT_TIER1) {
-                    // Increment unlock count
-                    await supabase.rpc('increment_unlock', { user_email: session.user.email });
-                    return grantAccess(session.user.email);
-                } else {
-                    // Hit Wall #1 - Redirect to Typeform
-                    return redirectToTypeform(user.email);
+
+            // Listen for auth state changes (handles magic link callback)
+            supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    // Re-run init to check access
+                    init();
                 }
-            }
-            
-        } catch (err) {
-            console.error('Gating init error:', err);
-            // On error, keep gate visible for safety
-        }
-    }
-    
-    // Listen for auth state changes (handles magic link callback)
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-            // Re-run init to check access
+            });
+
+            // Run on page load
             init();
-        }
-    });
-    
-    // Run on page load
-    init();
-})();
-</script>
+        })();
+    </script>
