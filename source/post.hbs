@@ -8,7 +8,7 @@
         .gh-gated-content {
             display: none;
         }
-        
+
         .gh-gated-content.is-locked {
             display: block;
             filter: blur(12px);
@@ -16,7 +16,7 @@
             opacity: 0.4;
             user-select: none;
         }
-        
+
         .gh-gated-content.is-unlocked {
             display: block;
             filter: none;
@@ -103,23 +103,23 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
-        
+
         .gh-gate-btn-secondary {
             background: transparent;
             color: #505050;
             border: 1px solid #e0e0e0;
         }
-        
+
         .gh-gate-btn-secondary:hover {
             background: #f5f5f5;
         }
-        
+
         .gh-gate-buttons {
             display: flex;
             gap: 12px;
             margin-top: 8px;
         }
-        
+
         .gh-gate-buttons .gh-gate-btn {
             flex: 1;
         }
@@ -163,7 +163,7 @@
         .gh-gate-success.is-visible {
             display: block;
         }
-        
+
         /* Loading spinner */
         .gh-gate-loading {
             display: flex;
@@ -171,7 +171,7 @@
             align-items: center;
             gap: 16px;
         }
-        
+
         .gh-gate-spinner {
             width: 40px;
             height: 40px;
@@ -180,15 +180,17 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
-        
+
         .gh-gate-view {
             display: none;
         }
-        
+
         .gh-gate-view.is-active {
             display: block;
         }
@@ -283,7 +285,7 @@
                     <p style="margin: 0;">Checking access...</p>
                 </div>
             </div>
-            
+
             {{!-- Request Briefing View --}}
             <div id="gh-gate-request" class="gh-gate-view">
                 <h2>Request Briefing</h2>
@@ -302,14 +304,15 @@
                 <h2>Partner Login</h2>
                 <p>Enter your email to receive a magic link.</p>
                 <form id="gh-gate-login-form" class="gh-gate-form">
-                    <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com" required>
+                    <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com"
+                        required>
                     <button type="submit" class="gh-gate-btn">Send Magic Link</button>
                 </form>
                 <div id="gh-gate-login-error" class="gh-gate-error"></div>
                 <div id="gh-gate-login-success" class="gh-gate-success"></div>
                 <p class="gh-gate-toggle">New here? <a id="gh-toggle-request">Request access</a></p>
             </div>
-            
+
             {{!-- Typeform Redirect Confirmation (Wall #1) --}}
             <div id="gh-gate-typeform" class="gh-gate-view">
                 <h2>Unlock More Reports</h2>
@@ -319,11 +322,12 @@
                     <button id="gh-typeform-confirm" class="gh-gate-btn">Continue</button>
                 </div>
             </div>
-            
+
             {{!-- Calendly Redirect Confirmation (Wall #2) --}}
             <div id="gh-gate-calendly" class="gh-gate-view">
                 <h2>Ready for Unlimited Access?</h2>
-                <p>You've explored our reports. Schedule a quick intro call to unlock unlimited access to all briefings.</p>
+                <p>You've explored our reports. Schedule a quick intro call to unlock unlimited access to all briefings.
+                </p>
                 <div class="gh-gate-buttons">
                     <button id="gh-calendly-cancel" class="gh-gate-btn gh-gate-btn-secondary">Maybe Later</button>
                     <button id="gh-calendly-confirm" class="gh-gate-btn">Schedule Call</button>
@@ -415,19 +419,19 @@
             document.getElementById('gh-toggle-request').addEventListener('click', () => showView('request'));
 
             // Typeform confirmation buttons
-            document.getElementById('gh-typeform-confirm').addEventListener('click', function() {
+            document.getElementById('gh-typeform-confirm').addEventListener('click', function () {
                 window.location.href = URL_TYPEFORM + '?user_email=' + encodeURIComponent(currentUserEmail);
             });
-            document.getElementById('gh-typeform-cancel').addEventListener('click', function() {
-                showView('request');
+            document.getElementById('gh-typeform-cancel').addEventListener('click', function () {
+                window.location.href = '/';
             });
 
             // Calendly confirmation buttons
-            document.getElementById('gh-calendly-confirm').addEventListener('click', function() {
+            document.getElementById('gh-calendly-confirm').addEventListener('click', function () {
                 window.location.href = URL_CALENDLY;
             });
-            document.getElementById('gh-calendly-cancel').addEventListener('click', function() {
-                showView('request');
+            document.getElementById('gh-calendly-cancel').addEventListener('click', function () {
+                window.location.href = '/';
             });
 
             // Request Briefing Form
