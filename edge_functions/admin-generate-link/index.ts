@@ -89,24 +89,76 @@ serve(async (req) => {
         .eq("email", normalizedEmail);
     }
 
-    // 4. Sync to HubSpot as Outbound lead
-    await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        properties: {
-          email: normalizedEmail,
-          lifecyclestage: "marketingqualifiedlead",
-          tier_status: "tier1",
-          beta_icp_list: "true",
-          founder_led_mql: "true",
-          lead_source: "Outbound",
+    // 4. Sync to HubSpot as Outbound lead (create or update)
+    try {
+      const hubspotProperties = {
+        email: normalizedEmail,
+        lifecyclestage: "marketingqualifiedlead",
+        tier_status: "tier1",
+        beta_icp_list: "true",
+        founder_led_mql: "true",
+        lead_source: "Outbound",
+      };
+
+      // First try to create the contact
+      const createResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({ properties: hubspotProperties }),
+      });
+
+      // If contact already exists (409 Conflict), update instead
+      if (createResponse.status === 409) {
+        console.log("HubSpot: Contact exists, updating...");
+        const searchResponse = await fetch(
+          "https://api.hubapi.com/crm/v3/objects/contacts/search",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              filterGroups: [{
+                filters: [{
+                  propertyName: "email",
+                  operator: "EQ",
+                  value: normalizedEmail,
+                }],
+              }],
+            }),
+          }
+        );
+
+        const searchData = await searchResponse.json();
+        if (searchData.results && searchData.results.length > 0) {
+          const contactId = searchData.results[0].id;
+          const { lifecyclestage, ...updateProps } = hubspotProperties;
+          await fetch(
+            `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`,
+            {
+              method: "PATCH",
+              headers: {
+                Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ properties: updateProps }),
+            }
+          );
+          console.log("HubSpot: Contact updated", contactId);
+        }
+      } else if (!createResponse.ok) {
+        const errorData = await createResponse.text();
+        console.error("HubSpot create error:", createResponse.status, errorData);
+      } else {
+        console.log("HubSpot: Contact created");
+      }
+    } catch (hubspotError) {
+      console.error("HubSpot sync error:", hubspotError);
+    }
 
     // 5. Log link generation for audit trail
     await supabase.from("admin_audit_log").insert({

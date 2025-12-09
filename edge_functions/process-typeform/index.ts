@@ -22,10 +22,10 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    
+
     // Per TRD: hidden field is 'user_email' passed from Wall #1
     const email = body.form_response?.hidden?.user_email || body.form_response?.hidden?.email;
-    
+
     if (!email) {
       console.error("process-typeform: Missing email in hidden fields", body.form_response?.hidden);
       return new Response(JSON.stringify({ error: "Missing user email" }), {
@@ -53,7 +53,7 @@ serve(async (req) => {
     // 1. Upgrade to tier2 in Supabase (unlocks_count is preserved, NOT reset)
     const { error: updateError } = await supabase
       .from("allowed_users")
-      .update({ 
+      .update({
         status: "tier2",
         updated_at: new Date().toISOString(),
       })
@@ -63,22 +63,57 @@ serve(async (req) => {
       console.error("process-typeform: Supabase update error", updateError);
     }
 
-    // 2. Enrich HubSpot record with sector/NPS data
-    await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        properties: {
-          email: normalizedEmail,
-          tier_status: "tier2",
-          sector_interest: sector,
-          nps_score: String(nps),
-        },
-      }),
-    });
+    // 2. Enrich HubSpot record with sector/NPS data (update existing contact)
+    try {
+      // Search for existing contact by email
+      const searchResponse = await fetch(
+        "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filterGroups: [{
+              filters: [{
+                propertyName: "email",
+                operator: "EQ",
+                value: normalizedEmail,
+              }],
+            }],
+          }),
+        }
+      );
+
+      const searchData = await searchResponse.json();
+      if (searchData.results && searchData.results.length > 0) {
+        const contactId = searchData.results[0].id;
+        // Update existing contact
+        await fetch(
+          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              properties: {
+                tier_status: "tier2",
+                sector_interest: sector,
+                nps_score: String(nps),
+              },
+            }),
+          }
+        );
+        console.log("HubSpot: Contact updated with tier2 data", contactId);
+      } else {
+        console.log("HubSpot: Contact not found for", normalizedEmail);
+      }
+    } catch (hubspotError) {
+      console.error("HubSpot sync error:", hubspotError);
+    }
 
     console.log("process-typeform: Upgraded to tier2", { email: normalizedEmail, sector, nps });
 

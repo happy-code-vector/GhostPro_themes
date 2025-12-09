@@ -77,23 +77,73 @@ serve(async (req) => {
 
     // 3. Sync to HubSpot as MQL with beta_icp_list flag
     try {
-      await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
+      const hubspotProperties = {
+        email: normalizedEmail,
+        lifecyclestage: "marketingqualifiedlead",
+        tier_status: "tier1",
+        beta_icp_list: "true",
+        founder_led_mql: "true",
+        lead_source: "inbound",
+      };
+
+      // First try to create the contact
+      const createResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${HUBSPOT_TOKEN}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          properties: {
-            email: normalizedEmail,
-            lifecyclestage: "marketingqualifiedlead",
-            tier_status: "tier1",
-            beta_icp_list: "true",
-            founder_led_mql: "true",
-            lead_source: "Inbound",
-          },
-        }),
+        body: JSON.stringify({ properties: hubspotProperties }),
       });
+
+      // If contact already exists (409 Conflict), update instead
+      if (createResponse.status === 409) {
+        console.log("HubSpot: Contact exists, updating...");
+        // Search for existing contact by email
+        const searchResponse = await fetch(
+          `https://api.hubapi.com/crm/v3/objects/contacts/search`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              filterGroups: [{
+                filters: [{
+                  propertyName: "email",
+                  operator: "EQ",
+                  value: normalizedEmail,
+                }],
+              }],
+            }),
+          }
+        );
+
+        const searchData = await searchResponse.json();
+        if (searchData.results && searchData.results.length > 0) {
+          const contactId = searchData.results[0].id;
+          // Update existing contact (don't overwrite lifecyclestage if already higher)
+          const { lifecyclestage, ...updateProps } = hubspotProperties;
+          await fetch(
+            `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`,
+            {
+              method: "PATCH",
+              headers: {
+                Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ properties: updateProps }),
+            }
+          );
+          console.log("HubSpot: Contact updated", contactId);
+        }
+      } else if (!createResponse.ok) {
+        const errorData = await createResponse.text();
+        console.error("HubSpot create error:", createResponse.status, errorData);
+      } else {
+        console.log("HubSpot: Contact created");
+      }
     } catch (hubspotError) {
       // Don't fail the request if HubSpot sync fails
       console.error("HubSpot sync error:", hubspotError);

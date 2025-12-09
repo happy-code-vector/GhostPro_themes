@@ -61,21 +61,56 @@ serve(async (req) => {
       console.error("upgrade-to-vip: Supabase update error", updateError);
     }
 
-    // 2. Update HubSpot lifecycle stage to SQL
-    await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        properties: {
-          email: normalizedEmail,
-          tier_status: "vip",
-          lifecyclestage: "salesqualifiedlead",
-        },
-      }),
-    });
+    // 2. Update HubSpot lifecycle stage to SQL (update existing contact)
+    try {
+      // Search for existing contact by email
+      const searchResponse = await fetch(
+        "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filterGroups: [{
+              filters: [{
+                propertyName: "email",
+                operator: "EQ",
+                value: normalizedEmail,
+              }],
+            }],
+          }),
+        }
+      );
+
+      const searchData = await searchResponse.json();
+      if (searchData.results && searchData.results.length > 0) {
+        const contactId = searchData.results[0].id;
+        // Update existing contact to VIP/SQL
+        await fetch(
+          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              properties: {
+                tier_status: "vip",
+                lifecyclestage: "salesqualifiedlead",
+              },
+            }),
+          }
+        );
+        console.log("HubSpot: Contact upgraded to VIP/SQL", contactId);
+      } else {
+        console.log("HubSpot: Contact not found for", normalizedEmail);
+      }
+    } catch (hubspotError) {
+      console.error("HubSpot sync error:", hubspotError);
+    }
 
     console.log("upgrade-to-vip: User upgraded to VIP", { email: normalizedEmail });
 
