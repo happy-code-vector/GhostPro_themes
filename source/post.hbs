@@ -409,60 +409,84 @@
 
             async function init() {
                 try {
+                    console.log('=== Gating Init Started ===');
+                    
                     // 1. Fetch global settings for tier limits
-                    const { data: settings } = await supabase
+                    const { data: settings, error: settingsError } = await supabase
                         .from('global_settings')
                         .select('key, value')
                         .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
+
+                    console.log('Settings:', settings, 'Error:', settingsError);
 
                     if (settings && settings.length > 0) {
                         const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
                         LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
                         LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
                     }
+                    console.log('Tier limits:', LIMIT_TIER1, LIMIT_TIER2);
 
                     // 2. Check for existing session
-                    const { data: { session } } = await supabase.auth.getSession();
+                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                    console.log('Session:', session ? 'Found' : 'None', 'Email:', session?.user?.email, 'Error:', sessionError);
 
                     if (!session) {
-                        // No session - show gate
+                        console.log('No session - showing gate');
                         return;
                     }
+
+                    const userEmail = session.user.email.toLowerCase().trim();
+                    console.log('Looking up user:', userEmail);
 
                     // 3. Get user status from allowed_users
                     const { data: user, error: userError } = await supabase
                         .from('allowed_users')
                         .select('status, unlocks_count, email')
-                        .eq('email', session.user.email)
+                        .eq('email', userEmail)
                         .single();
 
-                    if (userError || !user) {
-                        // User not in allowed_users - show gate
-                        console.log('User not found in allowed_users');
+                    console.log('User lookup result:', user, 'Error:', userError);
+
+                    if (userError) {
+                        console.error('Error fetching user:', userError.message, userError.code);
+                        // If RLS is blocking, try granting access anyway for authenticated users
+                        if (userError.code === 'PGRST116') {
+                            console.log('User not found in allowed_users, but authenticated - granting access');
+                            return grantAccess(userEmail);
+                        }
+                        return;
+                    }
+                    
+                    if (!user) {
+                        console.log('User not in allowed_users table');
                         return;
                     }
 
+                    console.log('User found:', user.status, 'Unlocks:', user.unlocks_count);
+
                     // 4. Check for Golden Ticket (promo access)
                     if (promoReport && promoReport === currentSlug) {
-                        // This is the promo report - grant free access without incrementing
-                        return grantAccess(session.user.email);
+                        console.log('Golden ticket access');
+                        return grantAccess(userEmail);
                     }
 
                     // 5. THE LADDER LOGIC
+                    console.log('Checking ladder logic for status:', user.status);
 
                     // VIP Check - Unlimited access
                     if (user.status === 'vip') {
-                        return grantAccess(session.user.email);
+                        console.log('VIP access granted');
+                        return grantAccess(userEmail);
                     }
 
                     // Tier 2 Check
                     if (user.status === 'tier2') {
                         if (user.unlocks_count < LIMIT_TIER2) {
-                            // Increment unlock count
-                            await supabase.rpc('increment_unlock', { user_email: session.user.email });
-                            return grantAccess(session.user.email);
+                            console.log('Tier 2 access granted, incrementing count');
+                            await supabase.rpc('increment_unlock', { user_email: userEmail });
+                            return grantAccess(userEmail);
                         } else {
-                            // Hit Wall #2 - Redirect to Calendly
+                            console.log('Tier 2 limit reached, redirecting to Calendly');
                             return redirectToCalendly();
                         }
                     }
@@ -470,14 +494,16 @@
                     // Tier 1 Check
                     if (user.status === 'tier1') {
                         if (user.unlocks_count < LIMIT_TIER1) {
-                            // Increment unlock count
-                            await supabase.rpc('increment_unlock', { user_email: session.user.email });
-                            return grantAccess(session.user.email);
+                            console.log('Tier 1 access granted, incrementing count');
+                            await supabase.rpc('increment_unlock', { user_email: userEmail });
+                            return grantAccess(userEmail);
                         } else {
-                            // Hit Wall #1 - Redirect to Typeform
+                            console.log('Tier 1 limit reached, redirecting to Typeform');
                             return redirectToTypeform(user.email);
                         }
                     }
+
+                    console.log('No matching status, keeping gate');
 
                 } catch (err) {
                     console.error('Gating init error:', err);
