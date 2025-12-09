@@ -22,17 +22,49 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const email = body.form_response.hidden.email;
-    const sector = body.form_response.answers[0].text;
-    const nps = body.form_response.answers[1].number;
+    
+    // Per TRD: hidden field is 'user_email' passed from Wall #1
+    const email = body.form_response?.hidden?.user_email || body.form_response?.hidden?.email;
+    
+    if (!email) {
+      console.error("process-typeform: Missing email in hidden fields", body.form_response?.hidden);
+      return new Response(JSON.stringify({ error: "Missing user email" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // 1. Update Supabase (preserve unlocks_count)
-    await supabase.from("allowed_users")
-      .update({ status: "tier2" })
-      .eq("email", email);
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // 2. Update HubSpot
-    await fetch(`https://api.hubapi.com/crm/v3/objects/contacts`, {
+    // Parse sector_interest and nps_score from Typeform payload
+    // Handle different answer formats
+    let sector = "";
+    let nps = 0;
+
+    const answers = body.form_response?.answers || [];
+    for (const answer of answers) {
+      if (answer.type === "text" || answer.type === "choice") {
+        sector = answer.text || answer.choice?.label || "";
+      } else if (answer.type === "number" || answer.type === "opinion_scale") {
+        nps = answer.number || 0;
+      }
+    }
+
+    // 1. Upgrade to tier2 in Supabase (unlocks_count is preserved, NOT reset)
+    const { error: updateError } = await supabase
+      .from("allowed_users")
+      .update({ 
+        status: "tier2",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("email", normalizedEmail);
+
+    if (updateError) {
+      console.error("process-typeform: Supabase update error", updateError);
+    }
+
+    // 2. Enrich HubSpot record with sector/NPS data
+    await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${HUBSPOT_TOKEN}`,
@@ -40,19 +72,22 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         properties: {
-          email,
+          email: normalizedEmail,
           tier_status: "tier2",
           sector_interest: sector,
-          nps_score: nps,
+          nps_score: String(nps),
         },
       }),
     });
+
+    console.log("process-typeform: Upgraded to tier2", { email: normalizedEmail, sector, nps });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    console.error("process-typeform error:", e);
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

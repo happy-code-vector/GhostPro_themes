@@ -24,28 +24,45 @@ serve(async (req) => {
     let email: string | null = null;
 
     // Handle both GET (redirect-based) and POST (webhook-based)
+    // Option A: Calendly redirect with email param
+    // Option B: Calendly webhook on 'invitee.created' event
     if (req.method === "GET") {
       const url = new URL(req.url);
       email = url.searchParams.get("email");
     } else {
       const body = await req.json();
-      email = body.email || body.payload?.email || body.payload?.invitee?.email;
+      // Support multiple Calendly webhook payload formats
+      email = body.email || 
+              body.payload?.email || 
+              body.payload?.invitee?.email ||
+              body.invitee?.email;
     }
 
     if (!email) {
-      return new Response(JSON.stringify({ error: "Invalid email" }), {
+      console.error("upgrade-to-vip: Missing email");
+      return new Response(JSON.stringify({ error: "Email is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // 1. Update Supabase to VIP
-    await supabase.from("allowed_users")
-      .update({ status: "vip" })
-      .eq("email", email);
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // 2. Update HubSpot
-    await fetch(`https://api.hubapi.com/crm/v3/objects/contacts`, {
+    // 1. Update Supabase to VIP (unlimited access)
+    const { error: updateError } = await supabase
+      .from("allowed_users")
+      .update({ 
+        status: "vip",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("email", normalizedEmail);
+
+    if (updateError) {
+      console.error("upgrade-to-vip: Supabase update error", updateError);
+    }
+
+    // 2. Update HubSpot lifecycle stage to SQL
+    await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${HUBSPOT_TOKEN}`,
@@ -53,18 +70,24 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         properties: {
-          email,
+          email: normalizedEmail,
           tier_status: "vip",
           lifecyclestage: "salesqualifiedlead",
         },
       }),
     });
 
-    return new Response(JSON.stringify({ success: true, message: "VIP updated" }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.log("upgrade-to-vip: User upgraded to VIP", { email: normalizedEmail });
+
+    return new Response(
+      JSON.stringify({ success: true, message: "VIP access granted" }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (e) {
+    console.error("upgrade-to-vip error:", e);
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
