@@ -485,8 +485,33 @@
                 }
             }
 
-            // Listen for auth state changes (handles magic link callback)
+            // Handle magic link callback - exchange token for session
+            async function handleAuthCallback() {
+                // Check if URL has auth tokens (from magic link)
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = hashParams.get('access_token');
+                const refreshToken = hashParams.get('refresh_token');
+
+                if (accessToken && refreshToken) {
+                    console.log('Magic link detected, setting session...');
+                    const { data, error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken
+                    });
+
+                    if (error) {
+                        console.error('Error setting session:', error);
+                    } else {
+                        console.log('Session set successfully');
+                        // Clean up URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }
+            }
+
+            // Listen for auth state changes
             supabase.auth.onAuthStateChange((event, session) => {
+                console.log('Auth state changed:', event);
                 if (event === 'SIGNED_IN' && session) {
                     // Re-run init to check access
                     init();
@@ -494,6 +519,10 @@
             });
 
             // Run on page load
-            init();
+            async function start() {
+                await handleAuthCallback();
+                await init();
+            }
+            start();
         })();
     </script>

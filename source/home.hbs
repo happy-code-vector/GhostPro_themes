@@ -1,6 +1,45 @@
 {{!< default}}
 {{!-- The tag above means: insert everything in this file into the body of the default.hbs template --}}
 
+{{!-- Supabase Auth Callback Handler --}}
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function() {
+    const SUPABASE_URL = 'https://ohwoclsqlwnchtjtylxj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    async function handleAuthCallback() {
+        // Check if URL has auth tokens (from magic link)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+            console.log('Magic link detected on home, setting session...');
+            const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+            });
+            
+            if (error) {
+                console.error('Error setting session:', error);
+            } else {
+                console.log('Session set successfully, user:', data.user?.email);
+                // Clean up URL and show success message
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Optional: Show a toast or redirect to library
+                alert('Welcome! You are now signed in. Browse our reports in the library.');
+            }
+        }
+    }
+    
+    handleAuthCallback();
+})();
+</script>
+
 {{> "components/header" headerStyle=@custom.header_style}}
 
 {{#match @custom.header_style "!=" "Highlight"}}
