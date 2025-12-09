@@ -4,11 +4,24 @@
 
     {{!-- Gating Styles --}}
     <style>
+        /* Hide content by default until auth check completes */
+        .gh-gated-content {
+            display: none;
+        }
+        
         .gh-gated-content.is-locked {
+            display: block;
             filter: blur(12px);
             pointer-events: none;
             opacity: 0.4;
             user-select: none;
+        }
+        
+        .gh-gated-content.is-unlocked {
+            display: block;
+            filter: none;
+            pointer-events: auto;
+            opacity: 1;
         }
 
         .gh-gate-overlay {
@@ -90,6 +103,26 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+        
+        .gh-gate-btn-secondary {
+            background: transparent;
+            color: #505050;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .gh-gate-btn-secondary:hover {
+            background: #f5f5f5;
+        }
+        
+        .gh-gate-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .gh-gate-buttons .gh-gate-btn {
+            flex: 1;
+        }
 
         .gh-gate-toggle {
             margin-top: 20px;
@@ -128,6 +161,35 @@
         }
 
         .gh-gate-success.is-visible {
+            display: block;
+        }
+        
+        /* Loading spinner */
+        .gh-gate-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .gh-gate-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top-color: var(--ghost-accent-color, #3db4f2);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .gh-gate-view {
+            display: none;
+        }
+        
+        .gh-gate-view.is-active {
             display: block;
         }
 
@@ -214,7 +276,15 @@
     {{!-- Gate Overlay Modal --}}
     <div id="gh-gate-overlay" class="gh-gate-overlay is-visible">
         <div class="gh-gate-modal">
-            {{!-- Default View: Request Briefing --}}
+            {{!-- Loading View --}}
+            <div id="gh-gate-loading" class="gh-gate-view is-active">
+                <div class="gh-gate-loading">
+                    <div class="gh-gate-spinner"></div>
+                    <p style="margin: 0;">Checking access...</p>
+                </div>
+            </div>
+            
+            {{!-- Request Briefing View --}}
             <div id="gh-gate-request" class="gh-gate-view">
                 <h2>Request Briefing</h2>
                 <p>Enter your email to access this intelligence report.</p>
@@ -227,18 +297,37 @@
                 <p class="gh-gate-toggle">Already a partner? <a id="gh-toggle-login">Sign in here</a></p>
             </div>
 
-            {{!-- Secondary View: Partner Login --}}
-            <div id="gh-gate-login" class="gh-gate-view" style="display: none;">
+            {{!-- Partner Login View --}}
+            <div id="gh-gate-login" class="gh-gate-view">
                 <h2>Partner Login</h2>
                 <p>Enter your email to receive a magic link.</p>
                 <form id="gh-gate-login-form" class="gh-gate-form">
-                    <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com"
-                        required>
+                    <input type="email" id="gh-gate-login-email" class="gh-gate-input" placeholder="your@email.com" required>
                     <button type="submit" class="gh-gate-btn">Send Magic Link</button>
                 </form>
                 <div id="gh-gate-login-error" class="gh-gate-error"></div>
                 <div id="gh-gate-login-success" class="gh-gate-success"></div>
                 <p class="gh-gate-toggle">New here? <a id="gh-toggle-request">Request access</a></p>
+            </div>
+            
+            {{!-- Typeform Redirect Confirmation (Wall #1) --}}
+            <div id="gh-gate-typeform" class="gh-gate-view">
+                <h2>Unlock More Reports</h2>
+                <p>You've accessed your free report. Complete a quick feedback form to unlock 2 more reports.</p>
+                <div class="gh-gate-buttons">
+                    <button id="gh-typeform-cancel" class="gh-gate-btn gh-gate-btn-secondary">Maybe Later</button>
+                    <button id="gh-typeform-confirm" class="gh-gate-btn">Continue</button>
+                </div>
+            </div>
+            
+            {{!-- Calendly Redirect Confirmation (Wall #2) --}}
+            <div id="gh-gate-calendly" class="gh-gate-view">
+                <h2>Ready for Unlimited Access?</h2>
+                <p>You've explored our reports. Schedule a quick intro call to unlock unlimited access to all briefings.</p>
+                <div class="gh-gate-buttons">
+                    <button id="gh-calendly-cancel" class="gh-gate-btn gh-gate-btn-secondary">Maybe Later</button>
+                    <button id="gh-calendly-confirm" class="gh-gate-btn">Schedule Call</button>
+                </div>
             </div>
         </div>
     </div>
@@ -266,7 +355,7 @@
     <script>
         (function () {
             // ============================================
-            // CONFIGURATION - Update these values
+            // CONFIGURATION
             // ============================================
             const SUPABASE_URL = 'https://ohwoclsqlwnchtjtylxj.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
@@ -274,42 +363,74 @@
             const URL_TYPEFORM = 'https://your.typeform.com/to/feedback';
             const URL_CALENDLY = 'https://calendly.com/founder/intro';
 
-            // Fallback limits (used if global_settings fetch fails)
             let LIMIT_TIER1 = 1;
             let LIMIT_TIER2 = 3;
+            let currentUserEmail = null;
 
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             // DOM Elements
             const gatedContent = document.getElementById('gh-gated-content');
-            const docsendContainer = document.getElementById('gh-docsend-container');
             const gateOverlay = document.getElementById('gh-gate-overlay');
-            const gateRequest = document.getElementById('gh-gate-request');
-            const gateLogin = document.getElementById('gh-gate-login');
+            const views = {
+                loading: document.getElementById('gh-gate-loading'),
+                request: document.getElementById('gh-gate-request'),
+                login: document.getElementById('gh-gate-login'),
+                typeform: document.getElementById('gh-gate-typeform'),
+                calendly: document.getElementById('gh-gate-calendly')
+            };
             const requestForm = document.getElementById('gh-gate-request-form');
             const loginForm = document.getElementById('gh-gate-login-form');
-            const toggleLogin = document.getElementById('gh-toggle-login');
-            const toggleRequest = document.getElementById('gh-toggle-request');
 
-            // Get current post slug from URL
             const currentSlug = window.location.pathname.replace(/^\/|\/$/g, '');
-
-            // Check for promo (Golden Ticket) parameter
             const urlParams = new URLSearchParams(window.location.search);
             const promoReport = urlParams.get('promo_report');
 
-            toggleLogin.addEventListener('click', function () {
-                gateRequest.style.display = 'none';
-                gateLogin.style.display = 'block';
+            // ============================================
+            // VIEW MANAGEMENT
+            // ============================================
+            function showView(viewName) {
+                Object.values(views).forEach(v => v.classList.remove('is-active'));
+                if (views[viewName]) {
+                    views[viewName].classList.add('is-active');
+                }
+            }
+
+            function showGate() {
+                gateOverlay.classList.add('is-visible');
+                gatedContent.classList.add('is-locked');
+                gatedContent.classList.remove('is-unlocked');
+            }
+
+            function hideGate() {
+                gateOverlay.classList.remove('is-visible');
+                gatedContent.classList.remove('is-locked');
+                gatedContent.classList.add('is-unlocked');
+            }
+
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            document.getElementById('gh-toggle-login').addEventListener('click', () => showView('login'));
+            document.getElementById('gh-toggle-request').addEventListener('click', () => showView('request'));
+
+            // Typeform confirmation buttons
+            document.getElementById('gh-typeform-confirm').addEventListener('click', function() {
+                window.location.href = URL_TYPEFORM + '?user_email=' + encodeURIComponent(currentUserEmail);
+            });
+            document.getElementById('gh-typeform-cancel').addEventListener('click', function() {
+                showView('request');
             });
 
-            toggleRequest.addEventListener('click', function () {
-                gateLogin.style.display = 'none';
-                gateRequest.style.display = 'block';
+            // Calendly confirmation buttons
+            document.getElementById('gh-calendly-confirm').addEventListener('click', function() {
+                window.location.href = URL_CALENDLY;
+            });
+            document.getElementById('gh-calendly-cancel').addEventListener('click', function() {
+                showView('request');
             });
 
-
-            // Request Briefing Form (New Users - Tier 1 Entry)
+            // Request Briefing Form
             requestForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
                 const email = document.getElementById('gh-gate-email').value;
@@ -334,10 +455,7 @@
                     });
 
                     const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Failed to send magic link');
-                    }
+                    if (!response.ok) throw new Error(data.error || 'Failed to send magic link');
 
                     successEl.textContent = 'Check your email for the magic link!';
                     successEl.classList.add('is-visible');
@@ -350,7 +468,7 @@
                 }
             });
 
-            // Partner Login Form (Returning Users)
+            // Partner Login Form
             loginForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
                 const email = document.getElementById('gh-gate-login-email').value;
@@ -366,11 +484,8 @@
                 try {
                     const { error } = await supabase.auth.signInWithOtp({
                         email: email,
-                        options: {
-                            emailRedirectTo: window.location.href
-                        }
+                        options: { emailRedirectTo: window.location.href }
                     });
-
                     if (error) throw error;
 
                     successEl.textContent = 'Check your email for the magic link!';
@@ -384,167 +499,139 @@
                 }
             });
 
-
+            // ============================================
+            // ACCESS CONTROL
+            // ============================================
             function grantAccess(email) {
-                // Hide gate overlay
-                gateOverlay.classList.remove('is-visible');
-
-                // Unlock content
-                gatedContent.classList.remove('is-locked');
-                // loadDocSend(email);
-
                 console.log('Access granted for:', email);
+                hideGate();
             }
 
-            function loadDocSend(email) {
+            function showTypeformWall(email) {
+                currentUserEmail = email;
+                showView('typeform');
             }
 
-            function redirectToTypeform(email) {
-                window.location.href = URL_TYPEFORM + '?user_email=' + encodeURIComponent(email);
+            function showCalendlyWall() {
+                showView('calendly');
             }
 
-            function redirectToCalendly() {
-                window.location.href = URL_CALENDLY;
-            }
-
+            // ============================================
+            // MAIN INIT
+            // ============================================
             async function init() {
                 try {
-                    console.log('=== Gating Init Started ===');
-                    
-                    // 1. Fetch global settings for tier limits
-                    const { data: settings, error: settingsError } = await supabase
+                    // Show loading while checking
+                    showView('loading');
+                    showGate();
+
+                    // 1. Fetch tier limits
+                    const { data: settings } = await supabase
                         .from('global_settings')
                         .select('key, value')
                         .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
-
-                    console.log('Settings:', settings, 'Error:', settingsError);
 
                     if (settings && settings.length > 0) {
                         const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
                         LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
                         LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
                     }
-                    console.log('Tier limits:', LIMIT_TIER1, LIMIT_TIER2);
 
-                    // 2. Check for existing session
-                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                    console.log('Session:', session ? 'Found' : 'None', 'Email:', session?.user?.email, 'Error:', sessionError);
+                    // 2. Check session
+                    const { data: { session } } = await supabase.auth.getSession();
 
                     if (!session) {
-                        console.log('No session - showing gate');
+                        console.log('No session - showing request form');
+                        showView('request');
                         return;
                     }
 
                     const userEmail = session.user.email.toLowerCase().trim();
-                    console.log('Looking up user:', userEmail);
+                    currentUserEmail = userEmail;
 
-                    // 3. Get user status from allowed_users
+                    // 3. Get user status
                     const { data: user, error: userError } = await supabase
                         .from('allowed_users')
                         .select('status, unlocks_count, email')
                         .eq('email', userEmail)
                         .single();
 
-                    console.log('User lookup result:', user, 'Error:', userError);
-
                     if (userError) {
-                        console.error('Error fetching user:', userError.message, userError.code);
-                        // If RLS is blocking, try granting access anyway for authenticated users
+                        console.error('User lookup error:', userError);
                         if (userError.code === 'PGRST116') {
-                            console.log('User not found in allowed_users, but authenticated - granting access');
+                            // User authenticated but not in allowed_users - grant access
                             return grantAccess(userEmail);
                         }
+                        showView('request');
                         return;
                     }
-                    
+
                     if (!user) {
-                        console.log('User not in allowed_users table');
+                        showView('request');
                         return;
                     }
 
-                    console.log('User found:', user.status, 'Unlocks:', user.unlocks_count);
-
-                    // 4. Check for Golden Ticket (promo access)
+                    // 4. Golden Ticket check
                     if (promoReport && promoReport === currentSlug) {
-                        console.log('Golden ticket access');
                         return grantAccess(userEmail);
                     }
 
                     // 5. THE LADDER LOGIC
-                    console.log('Checking ladder logic for status:', user.status);
-
-                    // VIP Check - Unlimited access
                     if (user.status === 'vip') {
-                        console.log('VIP access granted');
                         return grantAccess(userEmail);
                     }
 
-                    // Tier 2 Check
                     if (user.status === 'tier2') {
                         if (user.unlocks_count < LIMIT_TIER2) {
-                            console.log('Tier 2 access granted, incrementing count');
                             await supabase.rpc('increment_unlock', { user_email: userEmail });
                             return grantAccess(userEmail);
                         } else {
-                            console.log('Tier 2 limit reached, redirecting to Calendly');
-                            return redirectToCalendly();
+                            return showCalendlyWall();
                         }
                     }
 
-                    // Tier 1 Check
                     if (user.status === 'tier1') {
                         if (user.unlocks_count < LIMIT_TIER1) {
-                            console.log('Tier 1 access granted, incrementing count');
                             await supabase.rpc('increment_unlock', { user_email: userEmail });
                             return grantAccess(userEmail);
                         } else {
-                            console.log('Tier 1 limit reached, redirecting to Typeform');
-                            return redirectToTypeform(user.email);
+                            return showTypeformWall(userEmail);
                         }
                     }
 
-                    console.log('No matching status, keeping gate');
+                    showView('request');
 
                 } catch (err) {
                     console.error('Gating init error:', err);
-                    // On error, keep gate visible for safety
+                    showView('request');
                 }
             }
 
-            // Handle magic link callback - exchange token for session
+            // Handle magic link callback
             async function handleAuthCallback() {
-                // Check if URL has auth tokens (from magic link)
                 const hashParams = new URLSearchParams(window.location.hash.substring(1));
                 const accessToken = hashParams.get('access_token');
                 const refreshToken = hashParams.get('refresh_token');
 
                 if (accessToken && refreshToken) {
-                    console.log('Magic link detected, setting session...');
-                    const { data, error } = await supabase.auth.setSession({
+                    const { error } = await supabase.auth.setSession({
                         access_token: accessToken,
                         refresh_token: refreshToken
                     });
-
-                    if (error) {
-                        console.error('Error setting session:', error);
-                    } else {
-                        console.log('Session set successfully');
-                        // Clean up URL
+                    if (!error) {
                         window.history.replaceState({}, document.title, window.location.pathname);
                     }
                 }
             }
 
-            // Listen for auth state changes
+            // Auth state listener
             supabase.auth.onAuthStateChange((event, session) => {
-                console.log('Auth state changed:', event);
                 if (event === 'SIGNED_IN' && session) {
-                    // Re-run init to check access
                     init();
                 }
             });
 
-            // Run on page load
+            // Start
             async function start() {
                 await handleAuthCallback();
                 await init();
