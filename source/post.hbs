@@ -325,7 +325,11 @@
                 try {
                     const response = await fetch(EDGE_FUNCTION_URL + '/invite-user', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                            'apikey': SUPABASE_ANON_KEY
+                        },
                         body: JSON.stringify({ email: email })
                     });
 
