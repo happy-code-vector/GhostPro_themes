@@ -66,6 +66,105 @@
 {{!-- Scripts - handle responsive videos, infinite scroll, and navigation dropdowns --}}
 <script src="{{asset "built/source.js"}}"></script>
 
+{{!-- Supabase Global Auth Handler --}}
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function() {
+    const SUPABASE_URL = 'https://ohwoclsqlwnchtjtylxj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
+    
+    // Create global Supabase client
+    window.pmSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.pmAuth = {
+        session: null,
+        user: null,
+        isAuthenticated: false,
+        isLoading: true,
+        listeners: []
+    };
+    
+    // Subscribe to auth state changes
+    function onAuthChange(callback) {
+        window.pmAuth.listeners.push(callback);
+        // Immediately call with current state if not loading
+        if (!window.pmAuth.isLoading) {
+            callback(window.pmAuth);
+        }
+    }
+    window.pmAuth.onAuthChange = onAuthChange;
+    
+    // Notify all listeners
+    function notifyListeners() {
+        window.pmAuth.listeners.forEach(cb => cb(window.pmAuth));
+    }
+    
+    // Handle magic link tokens in URL hash
+    async function handleAuthCallback() {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+            console.log('[Auth] Magic link detected, setting session...');
+            const { data, error } = await window.pmSupabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+            });
+            
+            if (error) {
+                console.error('[Auth] Error setting session:', error);
+            } else {
+                console.log('[Auth] Session set successfully');
+                window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+            }
+            return data?.session;
+        }
+        return null;
+    }
+    
+    // Initialize auth state
+    async function initAuth() {
+        try {
+            // First handle any magic link callback
+            await handleAuthCallback();
+            
+            // Get current session
+            const { data: { session }, error } = await window.pmSupabase.auth.getSession();
+            
+            if (error) {
+                console.error('[Auth] Error getting session:', error);
+            }
+            
+            window.pmAuth.session = session;
+            window.pmAuth.user = session?.user || null;
+            window.pmAuth.isAuthenticated = !!session;
+            window.pmAuth.isLoading = false;
+            
+            console.log('[Auth] Initialized:', window.pmAuth.isAuthenticated ? session.user.email : 'Not authenticated');
+            notifyListeners();
+            
+        } catch (err) {
+            console.error('[Auth] Init error:', err);
+            window.pmAuth.isLoading = false;
+            notifyListeners();
+        }
+    }
+    
+    // Listen for auth state changes
+    window.pmSupabase.auth.onAuthStateChange((event, session) => {
+        console.log('[Auth] State changed:', event);
+        window.pmAuth.session = session;
+        window.pmAuth.user = session?.user || null;
+        window.pmAuth.isAuthenticated = !!session;
+        window.pmAuth.isLoading = false;
+        notifyListeners();
+    });
+    
+    // Start auth initialization
+    initAuth();
+})();
+</script>
+
 {{!-- Ghost outputs required functional scripts with this tag, it should always be the last thing before the closing body tag --}}
 {{ghost_foot}}
 

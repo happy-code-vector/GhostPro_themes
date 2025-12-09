@@ -1,6 +1,4 @@
 {{!< default}} {{!-- The tag above means: insert everything in this file into the body of the default.hbs template --}}
-    {{!-- Supabase JS Client --}} <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-    </script>
 
     {{!-- Gating Styles --}}
     <style>
@@ -355,7 +353,7 @@
     {{/get}}
     {{/if}}
 
-    {{!-- Gating Logic Script --}}
+    {{!-- Gating Logic Script (uses global pmSupabase from default.hbs) --}}
     <script>
         (function () {
             // ============================================
@@ -371,7 +369,8 @@
             let LIMIT_TIER2 = 3;
             let currentUserEmail = null;
 
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            // Use global Supabase client from default.hbs
+            const supabase = window.pmSupabase;
 
             // DOM Elements
             const gatedContent = document.getElementById('gh-gated-content');
@@ -611,35 +610,131 @@
                 }
             }
 
-            // Handle magic link callback
-            async function handleAuthCallback() {
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = hashParams.get('access_token');
-                const refreshToken = hashParams.get('refresh_token');
-
-                if (accessToken && refreshToken) {
-                    const { error } = await supabase.auth.setSession({
-                        access_token: accessToken,
-                        refresh_token: refreshToken
+            // Use global auth state from default.hbs
+            // Wait for global auth to be ready, then check access
+            function waitForAuth() {
+                // If global auth is still loading, wait for it
+                if (window.pmAuth && window.pmAuth.isLoading) {
+                    window.pmAuth.onAuthChange(function(auth) {
+                        if (!auth.isLoading) {
+                            checkAccess(auth);
+                        }
                     });
-                    if (!error) {
-                        window.history.replaceState({}, document.title, window.location.pathname);
+                } else if (window.pmAuth) {
+                    // Auth already loaded
+                    checkAccess(window.pmAuth);
+                } else {
+                    // Fallback: wait a bit for global auth to initialize
+                    setTimeout(waitForAuth, 100);
+                }
+            }
+
+            async function checkAccess(auth) {
+                showView('loading');
+                showGate();
+
+                // If not authenticated, show request form
+                if (!auth.isAuthenticated || !auth.session) {
+                    console.log('[Post] No session - showing request form');
+                    showView('request');
+                    return;
+                }
+
+                // User is authenticated, run the ladder logic
+                await init(auth.session);
+            }
+
+            // Modified init to accept session
+            async function initWithSession(session) {
+                try {
+                    const userEmail = session.user.email.toLowerCase().trim();
+                    currentUserEmail = userEmail;
+
+                    // Fetch tier limits
+                    const { data: settings } = await supabase
+                        .from('global_settings')
+                        .select('key, value')
+                        .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
+
+                    if (settings && settings.length > 0) {
+                        const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
+                        LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
+                        LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
+                    }
+
+                    // Get user status
+                    const { data: user, error: userError } = await supabase
+                        .from('allowed_users')
+                        .select('status, unlocks_count, email')
+                        .eq('email', userEmail)
+                        .single();
+
+                    if (userError) {
+                        console.error('[Post] User lookup error:', userError);
+                        if (userError.code === 'PGRST116') {
+                            return grantAccess(userEmail);
+                        }
+                        showView('request');
+                        return;
+                    }
+
+                    if (!user) {
+                        showView('request');
+                        return;
+                    }
+
+                    // Golden Ticket check
+                    if (promoReport && promoReport === currentSlug) {
+                        return grantAccess(userEmail);
+                    }
+
+                    // THE LADDER LOGIC
+                    if (user.status === 'vip') {
+                        return grantAccess(userEmail);
+                    }
+
+                    if (user.status === 'tier2') {
+                        if (user.unlocks_count < LIMIT_TIER2) {
+                            await supabase.rpc('increment_unlock', { user_email: userEmail });
+                            return grantAccess(userEmail);
+                        } else {
+                            return showCalendlyWall();
+                        }
+                    }
+
+                    if (user.status === 'tier1') {
+                        if (user.unlocks_count < LIMIT_TIER1) {
+                            await supabase.rpc('increment_unlock', { user_email: userEmail });
+                            return grantAccess(userEmail);
+                        } else {
+                            return showTypeformWall(userEmail);
+                        }
+                    }
+
+                    showView('request');
+
+                } catch (err) {
+                    console.error('[Post] Gating error:', err);
+                    showView('request');
+                }
+            }
+
+            // Override init to use session parameter
+            async function init(session) {
+                if (session) {
+                    await initWithSession(session);
+                } else {
+                    // Fallback to checking session directly
+                    const { data: { session: currentSession } } = await supabase.auth.getSession();
+                    if (currentSession) {
+                        await initWithSession(currentSession);
+                    } else {
+                        showView('request');
                     }
                 }
             }
 
-            // Auth state listener
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_IN' && session) {
-                    init();
-                }
-            });
-
-            // Start
-            async function start() {
-                await handleAuthCallback();
-                await init();
-            }
-            start();
+            // Start by waiting for global auth
+            waitForAuth();
         })();
     </script>
