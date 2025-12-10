@@ -365,8 +365,6 @@
             const URL_TYPEFORM = 'https://your.typeform.com/to/feedback';
             const URL_CALENDLY = 'https://calendly.com/founder/intro';
 
-            let LIMIT_TIER1 = 1;
-            let LIMIT_TIER2 = 3;
             let currentUserEmail = null;
 
             // Use global Supabase client from default.hbs
@@ -389,10 +387,13 @@
             const urlParams = new URLSearchParams(window.location.search);
             const promoReport = urlParams.get('promo_report');
 
+            console.log('[Post] Current slug:', currentSlug);
+
             // ============================================
             // VIEW MANAGEMENT
             // ============================================
             function showView(viewName) {
+                console.log('[Post] Showing view:', viewName);
                 Object.values(views).forEach(v => v.classList.remove('is-active'));
                 if (views[viewName]) {
                     views[viewName].classList.add('is-active');
@@ -506,235 +507,113 @@
             // ACCESS CONTROL
             // ============================================
             function grantAccess(email) {
-                console.log('Access granted for:', email);
+                console.log('[Post] Access GRANTED for:', email);
                 hideGate();
             }
 
             function showTypeformWall(email) {
+                console.log('[Post] Showing Typeform wall for:', email);
                 currentUserEmail = email;
                 showView('typeform');
             }
 
             function showCalendlyWall() {
+                console.log('[Post] Showing Calendly wall');
                 showView('calendly');
             }
 
             // ============================================
-            // MAIN INIT
+            // MAIN ACCESS CHECK - Uses edge function
             // ============================================
-            async function init() {
+            async function checkPostAccess(userEmail) {
+                console.log('[Post] checkPostAccess for:', userEmail, 'slug:', currentSlug);
+
+                // Golden Ticket bypass (client-side check)
+                if (promoReport && promoReport === currentSlug) {
+                    return grantAccess(userEmail);
+                }
+
                 try {
-                    // Show loading while checking
-                    showView('loading');
-                    showGate();
+                    // Call edge function to check and record access
+                    const response = await fetch(EDGE_FUNCTION_URL + '/check-post-access', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                            'apikey': SUPABASE_ANON_KEY
+                        },
+                        body: JSON.stringify({
+                            post_slug: currentSlug,
+                            user_email: userEmail
+                        })
+                    });
 
-                    // 1. Fetch tier limits
-                    const { data: settings } = await supabase
-                        .from('global_settings')
-                        .select('key, value')
-                        .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
+                    const result = await response.json();
+                    console.log('[Post] Edge function result:', result);
 
-                    if (settings && settings.length > 0) {
-                        const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
-                        LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
-                        LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
-                    }
-
-                    // 2. Check session
-                    const { data: { session } } = await supabase.auth.getSession();
-
-                    if (!session) {
-                        console.log('No session - showing request form');
+                    if (result.error) {
+                        console.error('[Post] Edge function error:', result.error);
                         showView('request');
                         return;
                     }
 
-                    const userEmail = session.user.email.toLowerCase().trim();
-                    currentUserEmail = userEmail;
-
-                    // 3. Get user status
-                    const { data: user, error: userError } = await supabase
-                        .from('allowed_users')
-                        .select('status, unlocks_count, email')
-                        .eq('email', userEmail)
-                        .single();
-
-                    if (userError) {
-                        console.error('User lookup error:', userError);
-                        if (userError.code === 'PGRST116') {
-                            // User authenticated but not in allowed_users - grant access
-                            return grantAccess(userEmail);
-                        }
-                        showView('request');
-                        return;
-                    }
-
-                    if (!user) {
-                        showView('request');
-                        return;
-                    }
-
-                    // 4. Golden Ticket check
-                    if (promoReport && promoReport === currentSlug) {
+                    if (result.can_access) {
                         return grantAccess(userEmail);
                     }
 
-                    // 5. THE LADDER LOGIC
-                    if (user.status === 'vip') {
-                        return grantAccess(userEmail);
+                    // Handle different denial reasons
+                    if (result.reason === 'tier1_limit') {
+                        return showTypeformWall(userEmail);
+                    } else if (result.reason === 'tier2_limit') {
+                        return showCalendlyWall();
+                    } else {
+                        // not_allowed or unknown
+                        showView('request');
                     }
-
-                    if (user.status === 'tier2') {
-                        if (user.unlocks_count < LIMIT_TIER2) {
-                            await supabase.rpc('increment_unlock', { user_email: userEmail });
-                            return grantAccess(userEmail);
-                        } else {
-                            return showCalendlyWall();
-                        }
-                    }
-
-                    if (user.status === 'tier1') {
-                        if (user.unlocks_count < LIMIT_TIER1) {
-                            await supabase.rpc('increment_unlock', { user_email: userEmail });
-                            return grantAccess(userEmail);
-                        } else {
-                            return showTypeformWall(userEmail);
-                        }
-                    }
-
-                    showView('request');
 
                 } catch (err) {
-                    console.error('Gating init error:', err);
+                    console.error('[Post] Error calling edge function:', err);
                     showView('request');
                 }
             }
 
-            // Use global auth state from default.hbs
-            // Wait for global auth to be ready, then check access
+            // ============================================
+            // AUTH INTEGRATION
+            // ============================================
             function waitForAuth() {
-                // If global auth is still loading, wait for it
+                console.log('[Post] Waiting for auth...');
                 if (window.pmAuth && window.pmAuth.isLoading) {
-                    window.pmAuth.onAuthChange(function(auth) {
+                    window.pmAuth.onAuthChange(function (auth) {
                         if (!auth.isLoading) {
-                            checkAccess(auth);
+                            handleAuth(auth);
                         }
                     });
                 } else if (window.pmAuth) {
-                    // Auth already loaded
-                    checkAccess(window.pmAuth);
+                    handleAuth(window.pmAuth);
                 } else {
-                    // Fallback: wait a bit for global auth to initialize
                     setTimeout(waitForAuth, 100);
                 }
             }
 
-            async function checkAccess(auth) {
+            async function handleAuth(auth) {
+                console.log('[Post] handleAuth called, auth:', auth);
                 showView('loading');
                 showGate();
 
-                // If not authenticated, show request form
                 if (!auth.isAuthenticated || !auth.session) {
-                    console.log('[Post] No session - showing request form');
+                    console.log('[Post] Not authenticated - showing request form');
                     showView('request');
                     return;
                 }
 
-                // User is authenticated, run the ladder logic
-                await init(auth.session);
+                const userEmail = auth.session.user.email.toLowerCase().trim();
+                currentUserEmail = userEmail;
+                console.log('[Post] User authenticated:', userEmail);
+
+                await checkPostAccess(userEmail);
             }
 
-            // Modified init to accept session
-            async function initWithSession(session) {
-                try {
-                    const userEmail = session.user.email.toLowerCase().trim();
-                    currentUserEmail = userEmail;
-
-                    // Fetch tier limits
-                    const { data: settings } = await supabase
-                        .from('global_settings')
-                        .select('key, value')
-                        .in('key', ['TIER1_LIMIT', 'TIER2_LIMIT']);
-
-                    if (settings && settings.length > 0) {
-                        const config = Object.fromEntries(settings.map(s => [s.key, parseInt(s.value)]));
-                        LIMIT_TIER1 = config.TIER1_LIMIT || LIMIT_TIER1;
-                        LIMIT_TIER2 = config.TIER2_LIMIT || LIMIT_TIER2;
-                    }
-
-                    // Get user status
-                    const { data: user, error: userError } = await supabase
-                        .from('allowed_users')
-                        .select('status, unlocks_count, email')
-                        .eq('email', userEmail)
-                        .single();
-
-                    if (userError) {
-                        console.error('[Post] User lookup error:', userError);
-                        if (userError.code === 'PGRST116') {
-                            return grantAccess(userEmail);
-                        }
-                        showView('request');
-                        return;
-                    }
-
-                    if (!user) {
-                        showView('request');
-                        return;
-                    }
-
-                    // Golden Ticket check
-                    if (promoReport && promoReport === currentSlug) {
-                        return grantAccess(userEmail);
-                    }
-
-                    // THE LADDER LOGIC
-                    if (user.status === 'vip') {
-                        return grantAccess(userEmail);
-                    }
-
-                    if (user.status === 'tier2') {
-                        if (user.unlocks_count < LIMIT_TIER2) {
-                            await supabase.rpc('increment_unlock', { user_email: userEmail });
-                            return grantAccess(userEmail);
-                        } else {
-                            return showCalendlyWall();
-                        }
-                    }
-
-                    if (user.status === 'tier1') {
-                        if (user.unlocks_count < LIMIT_TIER1) {
-                            await supabase.rpc('increment_unlock', { user_email: userEmail });
-                            return grantAccess(userEmail);
-                        } else {
-                            return showTypeformWall(userEmail);
-                        }
-                    }
-
-                    showView('request');
-
-                } catch (err) {
-                    console.error('[Post] Gating error:', err);
-                    showView('request');
-                }
-            }
-
-            // Override init to use session parameter
-            async function init(session) {
-                if (session) {
-                    await initWithSession(session);
-                } else {
-                    // Fallback to checking session directly
-                    const { data: { session: currentSession } } = await supabase.auth.getSession();
-                    if (currentSession) {
-                        await initWithSession(currentSession);
-                    } else {
-                        showView('request');
-                    }
-                }
-            }
-
-            // Start by waiting for global auth
+            // Start
             waitForAuth();
         })();
     </script>
