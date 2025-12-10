@@ -7,8 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const LIMIT_TIER1 = 1;
-const LIMIT_TIER2 = 3;
+// Default limits (fallback if not in database)
+const DEFAULT_LIMIT_TIER1 = 1;
+const DEFAULT_LIMIT_TIER2 = 3;
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -21,7 +22,7 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const { post_slug, user_email } = await req.json();
-    
+
     if (!post_slug) {
       return new Response(
         JSON.stringify({ error: "Missing post_slug" }),
@@ -41,7 +42,26 @@ Deno.serve(async (req: Request) => {
     // Use service role client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Get user status from allowed_users
+    // 1. Fetch tier limits from global_settings
+    let limitTier1 = DEFAULT_LIMIT_TIER1;
+    let limitTier2 = DEFAULT_LIMIT_TIER2;
+
+    const { data: settings } = await supabase
+      .from("global_settings")
+      .select("key, value")
+      .in("key", ["TIER1_LIMIT", "TIER2_LIMIT"]);
+
+    if (settings && settings.length > 0) {
+      for (const setting of settings) {
+        if (setting.key === "TIER1_LIMIT") {
+          limitTier1 = parseInt(setting.value) || DEFAULT_LIMIT_TIER1;
+        } else if (setting.key === "TIER2_LIMIT") {
+          limitTier2 = parseInt(setting.value) || DEFAULT_LIMIT_TIER2;
+        }
+      }
+    }
+
+    // 2. Get user status from allowed_users
     const { data: allowedUser, error: allowedError } = await supabase
       .from("allowed_users")
       .select("status")
@@ -50,8 +70,8 @@ Deno.serve(async (req: Request) => {
 
     if (allowedError || !allowedUser) {
       return new Response(
-        JSON.stringify({ 
-          can_access: false, 
+        JSON.stringify({
+          can_access: false,
           reason: "not_allowed",
           message: "User not in allowed list"
         }),
@@ -61,7 +81,7 @@ Deno.serve(async (req: Request) => {
 
     const userStatus = allowedUser.status;
 
-    // 2. VIP gets unlimited access
+    // 3. VIP gets unlimited access
     if (userStatus === "vip") {
       return new Response(
         JSON.stringify({ can_access: true, reason: "vip" }),
@@ -69,7 +89,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3. Check if user already unlocked this specific post
+    // 4. Check if user already unlocked this specific post
     const { data: existingUnlock } = await supabase
       .from("user_unlocks")
       .select("id")
@@ -84,7 +104,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 4. Count how many posts user has unlocked
+    // 5. Count how many posts user has unlocked
     const { count: unlockCount } = await supabase
       .from("user_unlocks")
       .select("*", { count: "exact", head: true })
@@ -92,15 +112,15 @@ Deno.serve(async (req: Request) => {
 
     const currentUnlocks = unlockCount || 0;
 
-    // 5. Determine limit based on tier
+    // 6. Determine limit based on tier
     let limit = 0;
     if (userStatus === "tier1") {
-      limit = LIMIT_TIER1;
+      limit = limitTier1;
     } else if (userStatus === "tier2") {
-      limit = LIMIT_TIER2;
+      limit = limitTier2;
     }
 
-    // 6. Check if under limit
+    // 7. Check if under limit
     if (currentUnlocks < limit) {
       // Unlock this post for the user
       await supabase
@@ -113,7 +133,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 7. User is at or over limit
+    // 8. User is at or over limit
     if (userStatus === "tier1") {
       return new Response(
         JSON.stringify({ can_access: false, reason: "tier1_limit" }),
