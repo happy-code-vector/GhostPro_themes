@@ -87,7 +87,7 @@ serve(async (req) => {
     }
 
     // 3. Send magic link email via Resend
-    const magicLink = `https://prepared-mind.ghost.io/magic-login?token=${magicToken}&email=${encodeURIComponent(normalizedEmail)}`;
+    const magicLink = `https://prepared-mind.ghost.io/?token=${magicToken}&email=${encodeURIComponent(normalizedEmail)}`;
     
     try {
       const { error: emailError } = await resend.emails.send({

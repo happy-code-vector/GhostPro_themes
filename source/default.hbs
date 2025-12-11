@@ -59,6 +59,144 @@
     
 </div>
 
+{{!-- Magic Link Verification Modal --}}
+<div id="pm-magic-link-modal" class="pm-magic-modal" style="display: none;">
+    <div class="pm-magic-modal-backdrop"></div>
+    <div class="pm-magic-modal-content">
+        <div class="pm-magic-loading">
+            <div class="pm-spinner"></div>
+            <h3>Verifying your magic link...</h3>
+            <p>Please wait while we sign you in.</p>
+        </div>
+        
+        <div class="pm-magic-success" style="display: none;">
+            <div class="pm-success-icon">✓</div>
+            <h3>Welcome!</h3>
+            <p>You have been successfully signed in.</p>
+            <button class="pm-continue-btn">Continue</button>
+        </div>
+        
+        <div class="pm-magic-error" style="display: none;">
+            <div class="pm-error-icon">✕</div>
+            <h3>Link Invalid</h3>
+            <p class="pm-error-message">This magic link is invalid or has expired.</p>
+            <button class="pm-close-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.pm-magic-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pm-magic-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.pm-magic-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    padding: 40px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.pm-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007cba;
+    border-radius: 50%;
+    animation: pm-spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes pm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.pm-success-icon {
+    width: 60px;
+    height: 60px;
+    background: #27ae60;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.pm-error-icon {
+    width: 60px;
+    height: 60px;
+    background: #e74c3c;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.pm-magic-modal h3 {
+    margin: 0 0 12px 0;
+    font-size: 20px;
+    color: #333;
+}
+
+.pm-magic-modal p {
+    margin: 0 0 24px 0;
+    color: #666;
+    line-height: 1.5;
+}
+
+.pm-continue-btn, .pm-close-btn {
+    background: #007cba;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s ease;
+}
+
+.pm-continue-btn:hover, .pm-close-btn:hover {
+    background: #005a8b;
+}
+
+.pm-close-btn {
+    background: #666;
+}
+
+.pm-close-btn:hover {
+    background: #555;
+}
+</style>
+
 {{#is "post, page"}}
     {{> "lightbox"}}
 {{/is}}
@@ -107,6 +245,9 @@
         if (token && email) {
             console.log('[Auth] Magic link detected, verifying...');
             
+            // Show verification modal
+            showMagicLinkModal('loading');
+            
             try {
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
                     method: 'POST',
@@ -138,19 +279,30 @@
                     // Show success message
                     sessionStorage.setItem('pm_just_signed_in', 'true');
                     
+                    // Show success modal
+                    showMagicLinkModal('success');
+                    
                     notifyListeners();
                     return true;
                 } else {
                     console.error('[Auth] Magic link verification failed:', result.error);
-                    showErrorToast(result.error || 'Invalid or expired magic link');
                     
                     // Clean URL even on error
                     const cleanUrl = window.location.pathname;
                     window.history.replaceState({}, document.title, cleanUrl);
+                    
+                    // Show error modal
+                    showMagicLinkModal('error', result.error || 'Invalid or expired magic link');
                 }
             } catch (error) {
                 console.error('[Auth] Magic link verification error:', error);
-                showErrorToast('Failed to verify magic link');
+                
+                // Clean URL even on error
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+                
+                // Show error modal
+                showMagicLinkModal('error', 'Failed to verify magic link');
             }
         }
         return false;
@@ -237,7 +389,80 @@
         }
     };
     
+    // Show magic link verification modal
+    function showMagicLinkModal(state, errorMessage = '') {
+        const modal = document.getElementById('pm-magic-link-modal');
+        const loadingEl = modal.querySelector('.pm-magic-loading');
+        const successEl = modal.querySelector('.pm-magic-success');
+        const errorEl = modal.querySelector('.pm-magic-error');
+        const errorMessageEl = modal.querySelector('.pm-error-message');
+        
+        // Hide all states first
+        loadingEl.style.display = 'none';
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+        
+        // Show appropriate state
+        if (state === 'loading') {
+            loadingEl.style.display = 'block';
+        } else if (state === 'success') {
+            successEl.style.display = 'block';
+        } else if (state === 'error') {
+            errorEl.style.display = 'block';
+            if (errorMessage) {
+                errorMessageEl.textContent = errorMessage;
+            }
+        }
+        
+        // Show modal
+        modal.style.display = 'flex';
+    }
+    
+    // Hide magic link modal
+    function hideMagicLinkModal() {
+        const modal = document.getElementById('pm-magic-link-modal');
+        modal.style.display = 'none';
+    }
+    
+    // Initialize modal event handlers
+    function initModalHandlers() {
+        const modal = document.getElementById('pm-magic-link-modal');
+        const continueBtn = modal.querySelector('.pm-continue-btn');
+        const closeBtn = modal.querySelector('.pm-close-btn');
+        const backdrop = modal.querySelector('.pm-magic-modal-backdrop');
+        
+        // Continue button (success state)
+        continueBtn?.addEventListener('click', function() {
+            hideMagicLinkModal();
+            // Show welcome toast
+            showSuccessToast(`Welcome back, ${window.pmAuth.user.email}! You are now signed in.`);
+        });
+        
+        // Close button (error state)
+        closeBtn?.addEventListener('click', function() {
+            hideMagicLinkModal();
+        });
+        
+        // Backdrop click
+        backdrop?.addEventListener('click', function() {
+            // Only allow closing on error state or success state
+            const errorEl = modal.querySelector('.pm-magic-error');
+            const successEl = modal.querySelector('.pm-magic-success');
+            if (errorEl.style.display !== 'none' || successEl.style.display !== 'none') {
+                hideMagicLinkModal();
+            }
+        });
+    }
+    
     // Utility functions for notifications
+    function showSuccessToast(message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:300px;';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+    
     function showErrorToast(message) {
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#e74c3c;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
@@ -245,6 +470,11 @@
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
     }
+    
+    // Initialize everything when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        initModalHandlers();
+    });
     
     // Start auth initialization
     initAuth();
