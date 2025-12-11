@@ -65,17 +65,6 @@ serve(async (req) => {
       .eq("email", normalizedEmail)
       .eq("token", token);
 
-    // Create or sign in the user
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: normalizedEmail,
-      email_confirm: true,
-    });
-
-    if (authError && authError.message !== "User already registered") {
-      console.error("Auth error:", authError);
-      throw new Error("Failed to authenticate user");
-    }
-
     // Generate a session for the user
     const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.generateLink({
       type: "magiclink",
