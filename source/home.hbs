@@ -1,41 +1,30 @@
 {{!< default}}
 {{!-- The tag above means: insert everything in this file into the body of the default.hbs template --}}
 
-{{!-- Auth callback is now handled globally in default.hbs --}}
-{{!-- Show welcome message when user signs in via magic link --}}
+{{!-- Magic link welcome handler --}}
 <script>
 (function() {
     // Wait for global auth to be ready
     function checkAuthStatus() {
         if (window.pmAuth && !window.pmAuth.isLoading) {
-            // Check if this is a fresh sign-in (URL had tokens that were just processed)
+            // Check if this is a fresh sign-in
             const wasJustSignedIn = sessionStorage.getItem('pm_just_signed_in');
-            if (window.pmAuth.isAuthenticated && !wasJustSignedIn) {
-                // Check if URL hash was just cleaned (indicates fresh magic link)
-                const urlHadTokens = sessionStorage.getItem('pm_had_tokens');
-                if (urlHadTokens) {
-                    sessionStorage.removeItem('pm_had_tokens');
-                    sessionStorage.setItem('pm_just_signed_in', 'true');
-                    // Show welcome notification
-                    showWelcomeToast('Welcome! You are now signed in.');
-                }
+            if (window.pmAuth.isAuthenticated && wasJustSignedIn) {
+                sessionStorage.removeItem('pm_just_signed_in');
+                // Show welcome notification
+                showWelcomeToast(`Welcome back, ${window.pmAuth.user.email}! You are now signed in.`);
             }
         } else {
             setTimeout(checkAuthStatus, 100);
         }
     }
     
-    // Check if URL has tokens before they get cleaned
-    if (window.location.hash.includes('access_token')) {
-        sessionStorage.setItem('pm_had_tokens', 'true');
-    }
-    
     function showWelcomeToast(message) {
         const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:300px;';
         toast.textContent = message;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
+        setTimeout(() => toast.remove(), 5000);
     }
     
     checkAuthStatus();

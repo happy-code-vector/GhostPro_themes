@@ -66,7 +66,7 @@
 {{!-- Scripts - handle responsive videos, infinite scroll, and navigation dropdowns --}}
 <script src="{{asset "built/source.js"}}"></script>
 
-{{!-- Supabase Global Auth Handler --}}
+{{!-- Magic Link Auth Handler --}}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function() {
@@ -98,49 +98,100 @@
         window.pmAuth.listeners.forEach(cb => cb(window.pmAuth));
     }
     
-    // Handle magic link tokens in URL hash
-    async function handleAuthCallback() {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
+    // Handle magic link verification from URL params
+    async function handleMagicLinkCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const email = urlParams.get('email');
         
-        if (accessToken && refreshToken) {
-            console.log('[Auth] Magic link detected, setting session...');
-            const { data, error } = await window.pmSupabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken
-            });
+        if (token && email) {
+            console.log('[Auth] Magic link detected, verifying...');
             
-            if (error) {
-                console.error('[Auth] Error setting session:', error);
-            } else {
-                console.log('[Auth] Session set successfully');
-                window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/verify-magic-link`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({ token, email })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    console.log('[Auth] Magic link verified successfully');
+                    
+                    // Clean URL
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                    
+                    // Set authenticated state
+                    window.pmAuth.user = { email: email };
+                    window.pmAuth.isAuthenticated = true;
+                    window.pmAuth.isLoading = false;
+                    
+                    // Store auth state in localStorage
+                    localStorage.setItem('pm_auth_user', JSON.stringify({ email: email }));
+                    localStorage.setItem('pm_auth_timestamp', Date.now().toString());
+                    
+                    // Show success message
+                    sessionStorage.setItem('pm_just_signed_in', 'true');
+                    
+                    notifyListeners();
+                    return true;
+                } else {
+                    console.error('[Auth] Magic link verification failed:', result.error);
+                    showErrorToast(result.error || 'Invalid or expired magic link');
+                    
+                    // Clean URL even on error
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }
+            } catch (error) {
+                console.error('[Auth] Magic link verification error:', error);
+                showErrorToast('Failed to verify magic link');
             }
-            return data?.session;
         }
-        return null;
+        return false;
+    }
+    
+    // Check stored auth state
+    function checkStoredAuth() {
+        const storedUser = localStorage.getItem('pm_auth_user');
+        const timestamp = localStorage.getItem('pm_auth_timestamp');
+        
+        if (storedUser && timestamp) {
+            const authAge = Date.now() - parseInt(timestamp);
+            const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+            
+            if (authAge < maxAge) {
+                window.pmAuth.user = JSON.parse(storedUser);
+                window.pmAuth.isAuthenticated = true;
+                console.log('[Auth] Restored session for:', window.pmAuth.user.email);
+                return true;
+            } else {
+                // Clear expired auth
+                localStorage.removeItem('pm_auth_user');
+                localStorage.removeItem('pm_auth_timestamp');
+            }
+        }
+        return false;
     }
     
     // Initialize auth state
     async function initAuth() {
         try {
-            // First handle any magic link callback
-            await handleAuthCallback();
+            // First check for magic link callback
+            const hadMagicLink = await handleMagicLinkCallback();
             
-            // Get current session
-            const { data: { session }, error } = await window.pmSupabase.auth.getSession();
-            
-            if (error) {
-                console.error('[Auth] Error getting session:', error);
+            // If no magic link, check stored auth
+            if (!hadMagicLink) {
+                checkStoredAuth();
             }
             
-            window.pmAuth.session = session;
-            window.pmAuth.user = session?.user || null;
-            window.pmAuth.isAuthenticated = !!session;
             window.pmAuth.isLoading = false;
-            
-            console.log('[Auth] Initialized:', window.pmAuth.isAuthenticated ? session.user.email : 'Not authenticated');
+            console.log('[Auth] Initialized:', window.pmAuth.isAuthenticated ? window.pmAuth.user.email : 'Not authenticated');
             notifyListeners();
             
         } catch (err) {
@@ -150,15 +201,50 @@
         }
     }
     
-    // Listen for auth state changes
-    window.pmSupabase.auth.onAuthStateChange((event, session) => {
-        console.log('[Auth] State changed:', event);
-        window.pmAuth.session = session;
-        window.pmAuth.user = session?.user || null;
-        window.pmAuth.isAuthenticated = !!session;
-        window.pmAuth.isLoading = false;
+    // Logout function
+    window.pmAuth.logout = function() {
+        localStorage.removeItem('pm_auth_user');
+        localStorage.removeItem('pm_auth_timestamp');
+        window.pmAuth.session = null;
+        window.pmAuth.user = null;
+        window.pmAuth.isAuthenticated = false;
         notifyListeners();
-    });
+        console.log('[Auth] Logged out');
+    };
+    
+    // Send magic link function
+    window.pmAuth.sendMagicLink = async function(email, source = 'website') {
+        try {
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/invite-user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({ email, source })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                return { success: true, message: result.message };
+            } else {
+                return { success: false, error: result.error || 'Failed to send magic link' };
+            }
+        } catch (error) {
+            console.error('[Auth] Send magic link error:', error);
+            return { success: false, error: 'Network error' };
+        }
+    };
+    
+    // Utility functions for notifications
+    function showErrorToast(message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#e74c3c;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
     
     // Start auth initialization
     initAuth();

@@ -1,9 +1,87 @@
-<form class="gh-form" data-members-form>
-    <input class="gh-form-input" id="{{email_field_id}}" name="email" type="email" placeholder="jamie@example.com" required data-members-email>
-    <button class="gh-button" type="submit" aria-label="Subscribe">
-        <span><span>Subscribe</span> {{> "icons/arrow"}}</span>
+<form class="gh-form pm-magic-link-form" data-pm-magic-form>
+    <input class="gh-form-input" id="{{email_field_id}}" name="email" type="email" placeholder="jamie@example.com" required data-pm-email>
+    <button class="gh-button" type="submit" aria-label="Get Magic Link">
+        <span><span data-pm-button-text>Get Magic Link</span> {{> "icons/arrow"}}</span>
         {{> "icons/loader"}}
         {{> "icons/checkmark"}}
     </button>
-    <p data-members-error></p>
+    <p data-pm-error></p>
+    <p data-pm-success></p>
 </form>
+
+<script>
+(function() {
+    // Handle magic link form submission
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('[data-pm-magic-form]');
+        
+        forms.forEach(function(form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const emailInput = form.querySelector('[data-pm-email]');
+                const button = form.querySelector('.gh-button');
+                const buttonText = form.querySelector('[data-pm-button-text]');
+                const errorEl = form.querySelector('[data-pm-error]');
+                const successEl = form.querySelector('[data-pm-success]');
+                
+                const email = emailInput.value.trim();
+                
+                // Clear previous messages
+                errorEl.textContent = '';
+                successEl.textContent = '';
+                errorEl.style.display = 'none';
+                successEl.style.display = 'none';
+                
+                if (!email) {
+                    showError('Please enter your email address');
+                    return;
+                }
+                
+                // Show loading state
+                button.classList.add('loading');
+                buttonText.textContent = 'Sending...';
+                
+                try {
+                    // Check if auth system is ready
+                    if (!window.pmAuth || !window.pmAuth.sendMagicLink) {
+                        throw new Error('Authentication system not ready');
+                    }
+                    
+                    const result = await window.pmAuth.sendMagicLink(email, 'subscription');
+                    
+                    if (result.success) {
+                        showSuccess(result.message);
+                        emailInput.value = '';
+                    } else {
+                        showError(result.error);
+                    }
+                } catch (error) {
+                    console.error('Magic link error:', error);
+                    showError('Something went wrong. Please try again.');
+                } finally {
+                    // Reset button state
+                    button.classList.remove('loading');
+                    buttonText.textContent = 'Get Magic Link';
+                }
+                
+                function showError(message) {
+                    errorEl.textContent = message;
+                    errorEl.style.display = 'block';
+                    errorEl.style.color = '#e74c3c';
+                    errorEl.style.fontSize = '14px';
+                    errorEl.style.marginTop = '8px';
+                }
+                
+                function showSuccess(message) {
+                    successEl.textContent = message;
+                    successEl.style.display = 'block';
+                    successEl.style.color = '#27ae60';
+                    successEl.style.fontSize = '14px';
+                    successEl.style.marginTop = '8px';
+                }
+            });
+        });
+    });
+})();
+</script>

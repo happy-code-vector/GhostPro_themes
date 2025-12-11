@@ -1,25 +1,56 @@
-{{#if @site.members_enabled}}
-    {{#unless @member}}
-        {{#match @custom.header_style "!=" "Landing"}}
-        {{#match @custom.header_style "!=" "Search"}}
-        {{#match @custom.header_style "!=" "Off"}}
-        {{#match posts.length ">=" 7}}
-            <section class="gh-cta gh-outer">
-                <div class="gh-cta-inner gh-inner">
-                    <div class="gh-cta-content">
-                        <h2 class="gh-cta-title is-title">
-                            {{#if @custom.signup_heading}}{{@custom.signup_heading}}{{else}}{{@site.title}}{{/if}}
-                        </h2>
-                        <p class="gh-cta-description is-body">
-                            {{#if @custom.signup_subheading}}{{@custom.signup_subheading}}{{else}}{{@site.description}}{{/if}}
-                        </p>
-                    </div>
-                    {{> "email-subscription" email_field_id="cta-email"}}
+{{!-- Show CTA for non-authenticated users --}}
+<div class="pm-cta-wrapper">
+    {{#match @custom.header_style "!=" "Landing"}}
+    {{#match @custom.header_style "!=" "Search"}}
+    {{#match @custom.header_style "!=" "Off"}}
+    {{#match posts.length ">=" 7}}
+        <section class="gh-cta gh-outer pm-auth-cta" style="display: none;">
+            <div class="gh-cta-inner gh-inner">
+                <div class="gh-cta-content">
+                    <h2 class="gh-cta-title is-title">
+                        {{#if @custom.signup_heading}}{{@custom.signup_heading}}{{else}}{{@site.title}}{{/if}}
+                    </h2>
+                    <p class="gh-cta-description is-body">
+                        {{#if @custom.signup_subheading}}{{@custom.signup_subheading}}{{else}}{{@site.description}}{{/if}}
+                    </p>
                 </div>
-            </section>
-        {{/match}}
-        {{/match}}
-        {{/match}}
-        {{/match}}
-    {{/unless}}
-{{/if}}
+                {{> "email-subscription" email_field_id="cta-email"}}
+            </div>
+        </section>
+    {{/match}}
+    {{/match}}
+    {{/match}}
+    {{/match}}
+</div>
+
+<script>
+(function() {
+    // Show/hide CTA based on authentication status
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctaEl = document.querySelector('.pm-auth-cta');
+        
+        if (!ctaEl) return;
+        
+        function updateCTAVisibility(authState) {
+            if (!authState.isLoading && !authState.isAuthenticated) {
+                ctaEl.style.display = 'block';
+            } else {
+                ctaEl.style.display = 'none';
+            }
+        }
+        
+        // Listen for auth changes
+        if (window.pmAuth) {
+            window.pmAuth.onAuthChange(updateCTAVisibility);
+        } else {
+            // Wait for auth system to load
+            const checkAuth = setInterval(() => {
+                if (window.pmAuth) {
+                    clearInterval(checkAuth);
+                    window.pmAuth.onAuthChange(updateCTAVisibility);
+                }
+            }, 100);
+        }
+    });
+})();
+</script>

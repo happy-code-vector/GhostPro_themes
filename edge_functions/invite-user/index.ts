@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@3.2.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,13 +14,18 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// Anon client for sending OTP (uses Supabase's built-in email)
-const supabaseAnon = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_ANON_KEY")!
-);
-
 const HUBSPOT_TOKEN = Deno.env.get("HUBSPOT_PRIVATE_APP_TOKEN")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+
+// Initialize Resend
+const resend = new Resend(RESEND_API_KEY);
+
+// Helper function to generate a secure token
+function generateMagicToken(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -61,18 +67,58 @@ serve(async (req) => {
       );
     }
 
-    // 2. Send Magic Link via signInWithOtp (Supabase sends email automatically)
-    const { error: otpError } = await supabaseAnon.auth.signInWithOtp({
-      email: normalizedEmail,
-      options: {
-        emailRedirectTo: "https://prepared-mind.ghost.io",
-        shouldCreateUser: true,
-      },
-    });
+    // 2. Generate magic link token and store it
+    const magicToken = generateMagicToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+    
+    // Store the magic token in database
+    const { error: tokenError } = await supabaseAdmin
+      .from("magic_tokens")
+      .upsert({
+        email: normalizedEmail,
+        token: magicToken,
+        expires_at: expiresAt.toISOString(),
+        used: false,
+      }, { onConflict: "email" });
 
-    if (otpError) {
-      console.error("OTP error:", otpError);
-      throw new Error(otpError.message);
+    if (tokenError) {
+      console.error("Token storage error:", tokenError);
+      throw new Error("Failed to generate magic link");
+    }
+
+    // 3. Send magic link email via Resend
+    const magicLink = `https://prepared-mind.ghost.io/magic-login?token=${magicToken}&email=${encodeURIComponent(normalizedEmail)}`;
+    
+    try {
+      const { error: emailError } = await resend.emails.send({
+        from: "hello@support.preparedmind.ai",
+        to: [normalizedEmail],
+        subject: "Your magic link to access Prepared Mind",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Welcome to Prepared Mind</h2>
+            <p>Click the link below to access your account:</p>
+            <a href="${magicLink}" 
+               style="display: inline-block; background-color: #007cba; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
+              Access Prepared Mind
+            </a>
+            <p style="color: #666; font-size: 14px;">
+              This link will expire in 24 hours. If you didn't request this, you can safely ignore this email.
+            </p>
+            <p style="color: #666; font-size: 12px;">
+              If the button doesn't work, copy and paste this link: ${magicLink}
+            </p>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        console.error("Resend email error:", emailError);
+        throw new Error("Failed to send magic link email");
+      }
+    } catch (resendError) {
+      console.error("Resend error:", resendError);
+      throw new Error("Failed to send magic link email");
     }
 
     // 3. Sync to HubSpot as MQL with beta_icp_list flag
@@ -150,7 +196,10 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: "Magic link sent to your email" }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Magic link sent to your email. Check your inbox and click the link to access Prepared Mind." 
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

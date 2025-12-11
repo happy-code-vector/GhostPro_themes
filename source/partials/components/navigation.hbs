@@ -26,28 +26,189 @@
         </nav>
 
         <div class="gh-navigation-actions">
-            {{#unless @site.members_enabled}}
-                {{^match navigationLayout "Stacked"}}
-                    {{> "search-toggle"}}
-                {{/match}}
-            {{else}}
+            {{^match navigationLayout "Stacked"}}
                 {{> "search-toggle"}}
-                <div class="gh-navigation-members">
-                    {{#unless @member}}
-                        {{#unless @site.members_invite_only}}
-                            <a href="#/portal/signin" data-portal="signin">Sign in</a>
-                            {{#unless hideSubscribeButton}}
-                                <a class="gh-button" href="#/portal/signup" data-portal="signup">Subscribe</a>
-                            {{/unless}}
-                        {{else}}
-                            <a class="gh-button" href="#/portal/signin" data-portal="signin">Sign in</a>
-                        {{/unless}}
-                    {{else}}
-                        <a class="gh-button" href="#/portal/account" data-portal="account">Account</a>
-                    {{/unless}}
+            {{/match}}
+            
+            {{!-- Magic Link Authentication --}}
+            <div class="gh-navigation-members pm-auth-section">
+                <div class="pm-auth-loading" style="display: none;">
+                    <span>Loading...</span>
                 </div>
-            {{/unless}}
+                
+                <div class="pm-auth-signed-out" style="display: none;">
+                    <a href="#" class="pm-signin-link" data-pm-signin>Sign in</a>
+                    <a class="gh-button" href="#" data-pm-subscribe>Subscribe</a>
+                </div>
+                
+                <div class="pm-auth-signed-in" style="display: none;">
+                    <span class="pm-user-email"></span>
+                    <a href="#" class="pm-logout-link" data-pm-logout>Sign out</a>
+                </div>
+            </div>
         </div>
 
     </div>
 </header>
+
+<script>
+(function() {
+    // Handle navigation authentication state
+    document.addEventListener('DOMContentLoaded', function() {
+        const authSection = document.querySelector('.pm-auth-section');
+        const loadingEl = authSection?.querySelector('.pm-auth-loading');
+        const signedOutEl = authSection?.querySelector('.pm-auth-signed-out');
+        const signedInEl = authSection?.querySelector('.pm-auth-signed-in');
+        const userEmailEl = authSection?.querySelector('.pm-user-email');
+        const signinLink = authSection?.querySelector('[data-pm-signin]');
+        const subscribeLink = authSection?.querySelector('[data-pm-subscribe]');
+        const logoutLink = authSection?.querySelector('[data-pm-logout]');
+        
+        if (!authSection) return;
+        
+        // Update UI based on auth state
+        function updateAuthUI(authState) {
+            if (authState.isLoading) {
+                loadingEl.style.display = 'block';
+                signedOutEl.style.display = 'none';
+                signedInEl.style.display = 'none';
+            } else if (authState.isAuthenticated) {
+                loadingEl.style.display = 'none';
+                signedOutEl.style.display = 'none';
+                signedInEl.style.display = 'flex';
+                signedInEl.style.alignItems = 'center';
+                signedInEl.style.gap = '12px';
+                if (userEmailEl) {
+                    userEmailEl.textContent = authState.user.email;
+                    userEmailEl.style.fontSize = '14px';
+                    userEmailEl.style.color = 'var(--color-darkgrey)';
+                }
+            } else {
+                loadingEl.style.display = 'none';
+                signedOutEl.style.display = 'flex';
+                signedOutEl.style.alignItems = 'center';
+                signedOutEl.style.gap = '12px';
+                signedInEl.style.display = 'none';
+            }
+        }
+        
+        // Listen for auth changes
+        if (window.pmAuth) {
+            window.pmAuth.onAuthChange(updateAuthUI);
+        } else {
+            // Wait for auth system to load
+            const checkAuth = setInterval(() => {
+                if (window.pmAuth) {
+                    clearInterval(checkAuth);
+                    window.pmAuth.onAuthChange(updateAuthUI);
+                }
+            }, 100);
+        }
+        
+        // Handle sign in click
+        signinLink?.addEventListener('click', function(e) {
+            e.preventDefault();
+            showMagicLinkModal('Sign in to your account');
+        });
+        
+        // Handle subscribe click
+        subscribeLink?.addEventListener('click', function(e) {
+            e.preventDefault();
+            showMagicLinkModal('Subscribe to get updates');
+        });
+        
+        // Handle logout click
+        logoutLink?.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (window.pmAuth && window.pmAuth.logout) {
+                window.pmAuth.logout();
+                showToast('You have been signed out', 'success');
+            }
+        });
+        
+        // Show magic link modal
+        function showMagicLinkModal(title) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+            
+            const content = document.createElement('div');
+            content.style.cssText = 'background:white;padding:32px;border-radius:8px;max-width:400px;width:90%;box-shadow:0 10px 25px rgba(0,0,0,0.2);';
+            
+            content.innerHTML = `
+                <h3 style="margin:0 0 16px 0;font-size:20px;color:#333;">${title}</h3>
+                <form class="pm-modal-form">
+                    <input type="email" placeholder="Enter your email" required style="width:100%;padding:12px;border:1px solid #ddd;border-radius:4px;margin-bottom:16px;font-size:16px;">
+                    <div style="display:flex;gap:12px;">
+                        <button type="submit" style="flex:1;background:#007cba;color:white;border:none;padding:12px;border-radius:4px;cursor:pointer;font-size:16px;">Send Magic Link</button>
+                        <button type="button" class="pm-modal-close" style="background:#f1f1f1;color:#333;border:none;padding:12px 16px;border-radius:4px;cursor:pointer;">Cancel</button>
+                    </div>
+                    <div class="pm-modal-message" style="margin-top:12px;font-size:14px;display:none;"></div>
+                </form>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            const form = content.querySelector('.pm-modal-form');
+            const emailInput = content.querySelector('input[type="email"]');
+            const submitBtn = content.querySelector('button[type="submit"]');
+            const closeBtn = content.querySelector('.pm-modal-close');
+            const messageEl = content.querySelector('.pm-modal-message');
+            
+            // Focus email input
+            emailInput.focus();
+            
+            // Handle form submission
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const email = emailInput.value.trim();
+                
+                if (!email) return;
+                
+                submitBtn.textContent = 'Sending...';
+                submitBtn.disabled = true;
+                messageEl.style.display = 'none';
+                
+                try {
+                    const result = await window.pmAuth.sendMagicLink(email, 'navigation');
+                    
+                    if (result.success) {
+                        messageEl.textContent = result.message;
+                        messageEl.style.color = '#27ae60';
+                        messageEl.style.display = 'block';
+                        emailInput.value = '';
+                        setTimeout(() => modal.remove(), 3000);
+                    } else {
+                        messageEl.textContent = result.error;
+                        messageEl.style.color = '#e74c3c';
+                        messageEl.style.display = 'block';
+                    }
+                } catch (error) {
+                    messageEl.textContent = 'Something went wrong. Please try again.';
+                    messageEl.style.color = '#e74c3c';
+                    messageEl.style.display = 'block';
+                } finally {
+                    submitBtn.textContent = 'Send Magic Link';
+                    submitBtn.disabled = false;
+                }
+            });
+            
+            // Handle close
+            closeBtn.addEventListener('click', () => modal.remove());
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+        
+        // Utility function for toast notifications
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db';
+            toast.style.cssText = `position:fixed;top:20px;right:20px;background:${bgColor};color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+    });
+})();
+</script>
