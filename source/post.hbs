@@ -486,13 +486,18 @@
                 successEl.classList.remove('is-visible');
 
                 try {
-                    const { error } = await supabase.auth.signInWithOtp({
-                        email: email,
-                        options: { emailRedirectTo: window.location.href }
-                    });
-                    if (error) throw error;
+                    // Use our magic link system instead of Supabase OTP
+                    if (!window.pmAuth || !window.pmAuth.sendMagicLink) {
+                        throw new Error('Authentication system not ready');
+                    }
+                    
+                    const result = await window.pmAuth.sendMagicLink(email, 'post_access');
+                    
+                    if (!result.success) {
+                        throw new Error(result.error);
+                    }
 
-                    successEl.textContent = 'Check your email for the magic link!';
+                    successEl.textContent = result.message;
                     successEl.classList.add('is-visible');
                     btn.textContent = 'Link Sent!';
                 } catch (err) {
@@ -582,15 +587,22 @@
             // ============================================
             function waitForAuth() {
                 console.log('[Post] Waiting for auth...');
-                if (window.pmAuth && window.pmAuth.isLoading) {
-                    window.pmAuth.onAuthChange(function (auth) {
-                        if (!auth.isLoading) {
-                            handleAuth(auth);
-                        }
-                    });
-                } else if (window.pmAuth) {
-                    handleAuth(window.pmAuth);
+                if (window.pmAuth) {
+                    console.log('[Post] pmAuth found:', window.pmAuth);
+                    if (window.pmAuth.isLoading) {
+                        console.log('[Post] Auth is loading, waiting for change...');
+                        window.pmAuth.onAuthChange(function (auth) {
+                            console.log('[Post] Auth state changed:', auth);
+                            if (!auth.isLoading) {
+                                handleAuth(auth);
+                            }
+                        });
+                    } else {
+                        console.log('[Post] Auth ready, handling immediately');
+                        handleAuth(window.pmAuth);
+                    }
                 } else {
+                    console.log('[Post] pmAuth not found, retrying...');
                     setTimeout(waitForAuth, 100);
                 }
             }
@@ -600,18 +612,33 @@
                 showView('loading');
                 showGate();
 
-                if (!auth.isAuthenticated || !auth.session) {
+                if (!auth.isAuthenticated || !auth.user) {
                     console.log('[Post] Not authenticated - showing request form');
                     showView('request');
                     return;
                 }
 
-                const userEmail = auth.session.user.email.toLowerCase().trim();
+                const userEmail = auth.user.email.toLowerCase().trim();
                 currentUserEmail = userEmail;
                 console.log('[Post] User authenticated:', userEmail);
 
                 await checkPostAccess(userEmail);
             }
+
+            // Debug function to check auth state
+            window.debugAuth = function() {
+                console.log('=== AUTH DEBUG ===');
+                console.log('window.pmAuth:', window.pmAuth);
+                if (window.pmAuth) {
+                    console.log('isAuthenticated:', window.pmAuth.isAuthenticated);
+                    console.log('isLoading:', window.pmAuth.isLoading);
+                    console.log('user:', window.pmAuth.user);
+                    console.log('session:', window.pmAuth.session);
+                }
+                console.log('localStorage pm_auth_user:', localStorage.getItem('pm_auth_user'));
+                console.log('localStorage pm_auth_timestamp:', localStorage.getItem('pm_auth_timestamp'));
+                console.log('==================');
+            };
 
             // Start
             waitForAuth();
