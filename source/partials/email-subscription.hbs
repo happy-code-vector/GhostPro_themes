@@ -68,17 +68,23 @@
                 function showError(message) {
                     errorEl.textContent = message;
                     errorEl.style.display = 'block';
-                    errorEl.style.color = '#e74c3c';
-                    errorEl.style.fontSize = '14px';
-                    errorEl.style.marginTop = '8px';
+                    errorEl.style.color = '#c0392b';
+                    errorEl.style.background = '#fdeaea';
+                    errorEl.style.padding = '10px';
+                    errorEl.style.borderRadius = '6px';
+                    errorEl.style.fontSize = '1.4rem';
+                    errorEl.style.marginTop = '12px';
                 }
                 
                 function showSuccess(message) {
                     successEl.textContent = message;
                     successEl.style.display = 'block';
                     successEl.style.color = '#27ae60';
-                    successEl.style.fontSize = '14px';
-                    successEl.style.marginTop = '8px';
+                    successEl.style.background = '#eafaf1';
+                    successEl.style.padding = '10px';
+                    successEl.style.borderRadius = '6px';
+                    successEl.style.fontSize = '1.4rem';
+                    successEl.style.marginTop = '12px';
                 }
             });
         });

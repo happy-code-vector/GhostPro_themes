@@ -95,20 +95,74 @@ serve(async (req) => {
         to: [normalizedEmail],
         subject: "Your magic link to access Prepared Mind",
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Welcome to Prepared Mind</h2>
-            <p>Click the link below to access your account:</p>
-            <a href="${magicLink}" 
-               style="display: inline-block; background-color: #007cba; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
-              Access Prepared Mind
-            </a>
-            <p style="color: #666; font-size: 14px;">
-              This link will expire in 24 hours. If you didn't request this, you can safely ignore this email.
-            </p>
-            <p style="color: #666; font-size: 12px;">
-              If the button doesn't work, copy and paste this link: ${magicLink}
-            </p>
-          </div>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="min-width: 100%; background-color: #f4f4f4;">
+              <tr>
+                <td align="center" style="padding: 48px 24px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);">
+                    <tr>
+                      <td style="padding: 48px 40px;">
+                        <!-- Header -->
+                        <h1 style="margin: 0 0 24px 0; font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: #15171a;">
+                          Welcome to Prepared Mind
+                        </h1>
+                        
+                        <!-- Body text -->
+                        <p style="margin: 0 0 32px 0; font-size: 16px; line-height: 1.6; color: #505050;">
+                          Click the button below to securely access your account. This magic link will sign you in instantly.
+                        </p>
+                        
+                        <!-- CTA Button -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 0 32px 0;">
+                          <tr>
+                            <td style="border-radius: 100px; background-color: #15171a;">
+                              <a href="${magicLink}" 
+                                 style="display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 600; line-height: 1; color: #ffffff; text-decoration: none; border-radius: 100px;">
+                                Access Prepared Mind
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                        
+                        <!-- Expiry notice -->
+                        <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.5; color: rgba(0, 0, 0, 0.55);">
+                          This link will expire in 24 hours. If you didn't request this, you can safely ignore this email.
+                        </p>
+                        
+                        <!-- Fallback link -->
+                        <div style="padding-top: 24px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
+                          <p style="margin: 0; font-size: 13px; line-height: 1.5; color: rgba(0, 0, 0, 0.55);">
+                            If the button doesn't work, copy and paste this link into your browser:
+                          </p>
+                          <p style="margin: 8px 0 0 0; font-size: 13px; line-height: 1.5; word-break: break-all; color: #15171a;">
+                            ${magicLink}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <!-- Footer -->
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 560px;">
+                    <tr>
+                      <td style="padding: 24px 40px; text-align: center;">
+                        <p style="margin: 0; font-size: 13px; line-height: 1.5; color: rgba(0, 0, 0, 0.4);">
+                          © ${new Date().getFullYear()} Prepared Mind. All rights reserved.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `,
       });
 

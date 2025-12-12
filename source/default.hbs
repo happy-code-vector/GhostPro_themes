@@ -457,7 +457,7 @@
     // Utility functions for notifications
     function showSuccessToast(message) {
         const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:300px;';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:1.4rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:300px;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
@@ -465,7 +465,7 @@
     
     function showErrorToast(message) {
         const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#e74c3c;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#c0392b;color:#fff;padding:16px 24px;border-radius:8px;z-index:10000;font-size:1.4rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
