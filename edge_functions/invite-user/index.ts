@@ -119,11 +119,11 @@ serve(async (req) => {
                         </p>
                         
                         <!-- CTA Button -->
-                        <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 0 32px 0;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="margin: 0 0 32px 0;">
                           <tr>
-                            <td style="border-radius: 100px; background-color: #15171a;">
+                            <td align="center">
                               <a href="${magicLink}" 
-                                 style="display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 600; line-height: 1; color: #ffffff; text-decoration: none; border-radius: 100px;">
+                                 style="display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 600; line-height: 1; color: #ffffff; text-decoration: none; border-radius: 100px; background-color: #3db4f2;">
                                 Access Prepared Mind
                               </a>
                             </td>

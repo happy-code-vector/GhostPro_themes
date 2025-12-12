@@ -86,13 +86,11 @@
 </div>
 
 <style>
+/* Magic Link Verification Modal - Aligned with theme styles */
 .pm-magic-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10000;
+    inset: 0;
+    z-index: 9998;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -100,29 +98,27 @@
 
 .pm-magic-modal-backdrop {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
 }
 
 .pm-magic-modal-content {
     position: relative;
-    background: white;
-    border-radius: 8px;
-    padding: 40px;
-    max-width: 400px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 48px 40px;
+    max-width: 420px;
     width: 90%;
     text-align: center;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .pm-spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #007cba;
+    border: 3px solid #e0e0e0;
+    border-top-color: var(--ghost-accent-color, #3db4f2);
     border-radius: 50%;
     animation: pm-spin 1s linear infinite;
     margin: 0 auto 20px;
@@ -150,7 +146,7 @@
 .pm-error-icon {
     width: 60px;
     height: 60px;
-    background: #e74c3c;
+    background: #c0392b;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -163,37 +159,43 @@
 
 .pm-magic-modal h3 {
     margin: 0 0 12px 0;
-    font-size: 20px;
-    color: #333;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #15171a;
 }
 
 .pm-magic-modal p {
     margin: 0 0 24px 0;
-    color: #666;
+    font-size: 1.5rem;
+    color: #505050;
     line-height: 1.5;
 }
 
 .pm-continue-btn, .pm-close-btn {
-    background: #007cba;
-    color: white;
+    background: var(--ghost-accent-color, #3db4f2);
+    color: #fff;
     border: none;
-    padding: 12px 24px;
-    border-radius: 4px;
+    padding: 14px 24px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background 0.2s ease;
+    font-size: 1.6rem;
+    font-weight: 600;
+    transition: opacity 0.2s ease;
 }
 
 .pm-continue-btn:hover, .pm-close-btn:hover {
-    background: #005a8b;
+    opacity: 0.9;
 }
 
 .pm-close-btn {
-    background: #666;
+    background: transparent;
+    color: #505050;
+    border: 1px solid #e0e0e0;
 }
 
 .pm-close-btn:hover {
-    background: #555;
+    background: #f5f5f5;
+    opacity: 1;
 }
 </style>
 
