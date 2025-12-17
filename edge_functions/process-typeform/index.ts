@@ -24,7 +24,7 @@ serve(async (req) => {
     const body = await req.json();
 
     // Per TRD: hidden field is 'user_email' passed from Wall #1
-    const email = body.form_response?.hidden?.user_email || body.form_response?.hidden?.email;
+    const email = body.form_response?.hidden?.email || body.form_response?.hidden?.email;
 
     if (!email) {
       console.error("process-typeform: Missing email in hidden fields", body.form_response?.hidden);
