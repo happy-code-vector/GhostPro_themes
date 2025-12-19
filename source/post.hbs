@@ -363,7 +363,7 @@
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9od29jbHNxbHduY2h0anR5bHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MTY3MTgsImV4cCI6MjA4MDQ5MjcxOH0.U7iz_Dlhei2erTfaNcEn8svZ__RyDwJ4S0LgBd1ipoE';
             const EDGE_FUNCTION_URL = SUPABASE_URL + '/functions/v1';
             const URL_TYPEFORM = 'https://form.typeform.com/to/wyZovfQt';
-            const URL_CALENDLY = 'https://calendly.com/founder/intro';
+            const URL_CALENDLY = 'https://calendly.com/hello-preparedmind/30min?month=';
 
             let currentUserEmail = null;
 
@@ -428,7 +428,10 @@
 
             // Calendly confirmation buttons
             document.getElementById('gh-calendly-confirm').addEventListener('click', function () {
-                window.location.href = URL_CALENDLY;
+                const now = new Date();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const yearMonth = now.getFullYear() + '-' + month;
+                window.location.href = URL_CALENDLY + yearMonth;
             });
             document.getElementById('gh-calendly-cancel').addEventListener('click', function () {
                 window.location.href = '/';
