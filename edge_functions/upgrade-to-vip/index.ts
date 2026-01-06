@@ -106,6 +106,78 @@ serve(async (req) => {
       });
     }
 
+    // 3. Send email notification if upgraded to VIP
+    if (tier_status.toLowerCase() === "vip") {
+      try {
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "noreply@yourdomain.com", // Replace with your verified domain
+            to: [normalizedEmail],
+            subject: "🎉 Welcome to VIP Access!",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #333; text-align: center;">🎉 Congratulations!</h1>
+                <p style="font-size: 16px; line-height: 1.6; color: #555;">
+                  Great news! Your account has been upgraded to <strong>VIP status</strong>.
+                </p>
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="color: #333; margin-top: 0;">Your VIP Benefits Include:</h3>
+                  <ul style="color: #555; line-height: 1.8;">
+                    <li>Unlimited access to all premium features</li>
+                    <li>Priority customer support</li>
+                    <li>Early access to new features</li>
+                    <li>Exclusive VIP content and resources</li>
+                  </ul>
+                </div>
+                <p style="font-size: 16px; line-height: 1.6; color: #555;">
+                  You can start enjoying your VIP benefits immediately. If you have any questions, 
+                  don't hesitate to reach out to our support team.
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="https://yourdomain.com/dashboard" 
+                     style="background-color: #007bff; color: white; padding: 12px 24px; 
+                            text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Access Your VIP Dashboard
+                  </a>
+                </div>
+                <p style="font-size: 14px; color: #888; text-align: center; margin-top: 30px;">
+                  Thank you for being a valued member!
+                </p>
+              </div>
+            `,
+            text: `
+Congratulations! Your account has been upgraded to VIP status.
+
+Your VIP Benefits Include:
+- Unlimited access to all premium features
+- Priority customer support  
+- Early access to new features
+- Exclusive VIP content and resources
+
+You can start enjoying your VIP benefits immediately. If you have any questions, don't hesitate to reach out to our support team.
+
+Thank you for being a valued member!
+            `.trim(),
+          }),
+        });
+
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          console.log("VIP upgrade email sent successfully:", emailData.id);
+        } else {
+          const errorData = await emailResponse.text();
+          console.error("Failed to send VIP upgrade email:", errorData);
+        }
+      } catch (emailError) {
+        console.error("Email sending error:", emailError);
+      }
+    }
+
     console.log("upgrade-to-vip: User tier status updated", { 
       email: normalizedEmail, 
       old_status: existingUser.status, 
