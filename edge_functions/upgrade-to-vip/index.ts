@@ -13,6 +13,7 @@ const supabase = createClient(
 );
 
 const HUBSPOT_TOKEN = Deno.env.get("HUBSPOT_PRIVATE_APP_TOKEN")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -22,20 +23,20 @@ serve(async (req) => {
 
   try {
     let email: string | null = null;
+    let tier_status: string | null = null;
 
     // Handle both GET (redirect-based) and POST (webhook-based)
-    // Option A: Calendly redirect with email param
-    // Option B: Calendly webhook on 'invitee.created' event
     if (req.method === "GET") {
       const url = new URL(req.url);
       email = url.searchParams.get("email");
+      tier_status = url.searchParams.get("tier_status");
     } else {
       const body = await req.json();
-      // Support multiple Calendly webhook payload formats
       email = body.email || 
               body.payload?.email || 
               body.payload?.invitee?.email ||
               body.invitee?.email;
+      tier_status = body.tier_status || body.payload?.tier_status;
     }
 
     if (!email) {
@@ -46,76 +47,78 @@ serve(async (req) => {
       });
     }
 
+    if (!tier_status) {
+      console.error("upgrade-to-vip: Missing tier_status");
+      return new Response(JSON.stringify({ error: "Tier status is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Update Supabase to VIP (unlimited access)
+    // 1. Check if user exists with same email but different tier status
+    const { data: existingUser, error: selectError } = await supabase
+      .from("allowed_users")
+      .select("*")
+      .eq("email", normalizedEmail)
+      .single();
+
+    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error("upgrade-to-vip: Database select error", selectError);
+      return new Response(JSON.stringify({ error: "Database error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if user exists and has different tier status
+    if (!existingUser) {
+      console.log("upgrade-to-vip: No existing user found with email", normalizedEmail);
+      return new Response(JSON.stringify({ error: "User not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (existingUser.status === tier_status) {
+      console.log("upgrade-to-vip: User already has the same tier status", { email: normalizedEmail, tier_status });
+      return new Response(JSON.stringify({ message: "User already has the same tier status" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Update Supabase with new tier status
     const { error: updateError } = await supabase
       .from("allowed_users")
       .update({ 
-        status: "vip",
+        status: tier_status,
         updated_at: new Date().toISOString(),
       })
       .eq("email", normalizedEmail);
 
     if (updateError) {
       console.error("upgrade-to-vip: Supabase update error", updateError);
+      return new Response(JSON.stringify({ error: "Failed to update user" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // 2. Update HubSpot lifecycle stage to SQL (update existing contact)
-    try {
-      // Search for existing contact by email
-      const searchResponse = await fetch(
-        "https://api.hubapi.com/crm/v3/objects/contacts/search",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filterGroups: [{
-              filters: [{
-                propertyName: "email",
-                operator: "EQ",
-                value: normalizedEmail,
-              }],
-            }],
-          }),
-        }
-      );
-
-      const searchData = await searchResponse.json();
-      if (searchData.results && searchData.results.length > 0) {
-        const contactId = searchData.results[0].id;
-        // Update existing contact to VIP/SQL
-        await fetch(
-          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}`,
-          {
-            method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              properties: {
-                tier_status: "vip",
-                lifecyclestage: "salesqualifiedlead",
-              },
-            }),
-          }
-        );
-        console.log("HubSpot: Contact upgraded to VIP/SQL", contactId);
-      } else {
-        console.log("HubSpot: Contact not found for", normalizedEmail);
-      }
-    } catch (hubspotError) {
-      console.error("HubSpot sync error:", hubspotError);
-    }
-
-    console.log("upgrade-to-vip: User upgraded to VIP", { email: normalizedEmail });
+    console.log("upgrade-to-vip: User tier status updated", { 
+      email: normalizedEmail, 
+      old_status: existingUser.status, 
+      new_status: tier_status 
+    });
 
     return new Response(
-      JSON.stringify({ success: true, message: "VIP access granted" }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Tier status updated successfully",
+        old_status: existingUser.status,
+        new_status: tier_status
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
