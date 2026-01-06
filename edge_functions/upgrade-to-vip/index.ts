@@ -116,7 +116,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "noreply@yourdomain.com", // Replace with your verified domain
+            from: "hello@support.preparedmind.ai",
             to: [normalizedEmail],
             subject: "🎉 Welcome to VIP Access!",
             html: `
